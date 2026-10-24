@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-The project uses Expo SDK 58, compatible with Expo Go for SDK 58. The start script explicitly selects Expo Go, so scan its QR code with the Expo Go app. If Expo Go still reports an SDK mismatch, update Expo Go and scan a newly generated QR code after restarting the server. For a browser preview, run `npx expo start --web`; web dependencies are already installed.
+The start scripts select Expo Go and use an Expo tunnel, which works across different Wi-Fi networks. Open Expo Go and scan the QR code from Expo Go's scanner; scanning with the phone camera may open a web page instead. If Expo Go reports an SDK mismatch, update Expo Go and restart the server to generate a new QR code. For a browser preview, run `npx expo start --web`; web dependencies are already installed.
 
 Tasks, alarms, and timer settings are stored on the device. Alarm notifications require notification permission. As with other scheduled notifications, delivery and sound can be affected by device focus, battery, and operating-system settings; this app does not yet provide a guaranteed full-screen system-clock alarm.
 
