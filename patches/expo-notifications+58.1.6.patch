@@ -1,0 +1,25 @@
+diff --git a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+index 4ad9aff..c2ca758 100644
+--- a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
++++ b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+@@ -1,2 +1,5 @@
+-import { requireNativeModule } from 'expo';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
++import { requireOptionalNativeModule } from 'expo';
++export default requireOptionalNativeModule('ExpoTopicSubscriptionModule') ?? {
++    addListener: () => { },
++    removeListeners: () => { },
++};
+diff --git a/node_modules/expo-notifications/src/TopicSubscriptionModule.android.ts b/node_modules/expo-notifications/src/TopicSubscriptionModule.android.ts
+index da3fae4..d375c21 100644
+--- a/node_modules/expo-notifications/src/TopicSubscriptionModule.android.ts
++++ b/node_modules/expo-notifications/src/TopicSubscriptionModule.android.ts
+@@ -1 +1 @@
+-import { requireNativeModule } from 'expo';
++import { requireOptionalNativeModule } from 'expo';
+@@ -5 +5,4 @@
+-export default requireNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule');
++export default requireOptionalNativeModule<TopicSubscriptionModule>('ExpoTopicSubscriptionModule') ?? {
++  addListener: () => {},
++  removeListeners: () => {},
++};
