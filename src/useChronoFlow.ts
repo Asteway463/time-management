@@ -1,13 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
-import { defaultData, nextAlarmDate, nextTime, STORAGE_KEY, todayKey, validTime } from './constants';
+import { defaultData, nextAlarmDate, nextTime, todayKey, validTime } from './constants';
+import {
+  scheduleFocusCompletionNotificationAsync,
+  syncAlarmNotificationsAsync,
+} from './notifications';
+import { loadAppData, saveAppData } from './storage';
 import type { Alarm, AppData, Category, FocusMode, Priority, Tab, Task } from './types';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
@@ -42,6 +45,7 @@ export function useChronoFlow() {
   const [timerEndAt, setTimerEndAt] = useState<number | null>(null);
   const lastFiredRef = useRef('');
   const timerNotificationRef = useRef<string | null>(null);
+  const timerNotificationGenerationRef = useRef(0);
   const focusSessionStartedAtRef = useRef<number | null>(null);
   const dataRef = useRef(data);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -51,7 +55,7 @@ export function useChronoFlow() {
   const persist = (next: AppData) => {
     persistQueueRef.current = persistQueueRef.current.then(async () => {
       try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        await saveAppData(next);
       } catch (error) {
         Alert.alert('Could not save changes', String(error));
       }
@@ -65,69 +69,21 @@ export function useChronoFlow() {
     void persist(next);
   }, []);
 
-  const syncAlarmNotifications = useCallback(async (alarms: Alarm[], askPermission: boolean) => {
+  const syncNotifications = useCallback(async (alarms: Alarm[], askPermission: boolean) => {
     if (Platform.OS === 'web') return;
     try {
-      let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && askPermission) {
-        permission = await Notifications.requestPermissionsAsync();
-      }
-      if (!permission.granted) {
-        if (askPermission) {
-          Alert.alert(
-            'Notifications are off',
-            'The alarm is saved, but Expo cannot notify you while the app is closed until notification permission is enabled.',
-          );
-        }
-        return;
-      }
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('alarms', {
-          name: 'Alarms',
-          importance: Notifications.AndroidImportance.MAX,
-          sound: 'default',
-          vibrationPattern: [0, 500, 250, 500],
-        });
-      }
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      for (const notification of scheduled) {
-        if (notification.content.data?.alarmId) {
-          await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-        }
-      }
-      for (const alarm of alarms.filter((item) => item.active)) {
-        const content: Notifications.NotificationContentInput = {
-          title: alarm.label || 'ChronoFlow alarm',
-          body: `${alarm.category} alarm · ${alarm.time}`,
-          sound: 'default',
-          data: { alarmId: alarm.id },
-          ...(Platform.OS === 'android' ? { channelId: 'alarms' } : {}),
-        };
-        if (alarm.days.length > 0) {
-          for (const day of alarm.days) {
-            await Notifications.scheduleNotificationAsync({
-              content,
-              trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-                weekday: day + 1,
-                hour: Number(alarm.time.slice(0, 2)),
-                minute: Number(alarm.time.slice(3, 5)),
-              },
-            });
-          }
-        } else {
-          const fireAt = alarm.fireAt ?? nextTime(alarm.time).getTime();
-          await Notifications.scheduleNotificationAsync({
-            content,
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date: new Date(fireAt),
-            },
-          });
-        }
+      const result = await syncAlarmNotificationsAsync(alarms, askPermission);
+      if (result === 'permission-denied' && askPermission) {
+        Alert.alert(
+          'Notifications are off',
+          'The alarm is saved, but it will not notify you until notification permission is enabled in system settings.',
+        );
       }
     } catch (error) {
-      Alert.alert('Could not schedule alarm notifications', String(error));
+      Alert.alert(
+        'Could not schedule alarm notifications',
+        `Your alarm is saved, but its reminder could not be scheduled. ${String(error)}`,
+      );
     }
   }, []);
 
@@ -135,30 +91,7 @@ export function useChronoFlow() {
     let mounted = true;
     const load = async () => {
       try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!stored) return;
-        const parsed = JSON.parse(stored) as Partial<AppData>;
-        const defaults = defaultData();
-        const loadedData: AppData = {
-          ...defaults,
-          ...parsed,
-          alarms: Array.isArray(parsed.alarms)
-            ? parsed.alarms.map((alarm) => {
-              const migrated = alarm.days.length === 0 && alarm.fireAt === undefined
-                ? { ...alarm, fireAt: nextTime(alarm.time).getTime() }
-                : alarm;
-              return migrated.days.length === 0 && migrated.fireAt !== undefined && migrated.fireAt <= Date.now()
-                ? { ...migrated, active: false }
-                : migrated;
-            })
-            : defaults.alarms,
-          tasks: Array.isArray(parsed.tasks) ? parsed.tasks : defaults.tasks,
-          focus: { ...defaults.focus, ...parsed.focus },
-        };
-        if (loadedData.focus.focusDate !== todayKey()) {
-          loadedData.focus.focusDate = todayKey();
-          loadedData.focus.totalFocusMinsToday = 0;
-        }
+        const loadedData = await loadAppData();
         if (mounted) setData(loadedData);
       } catch (error) {
         Alert.alert('Could not load saved data', String(error));
@@ -174,8 +107,8 @@ export function useChronoFlow() {
 
   useEffect(() => {
     if (!loaded) return;
-    void syncAlarmNotifications(dataRef.current.alarms, false);
-  }, [loaded, syncAlarmNotifications]);
+    void syncNotifications(dataRef.current.alarms, false);
+  }, [loaded, syncNotifications]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -254,25 +187,34 @@ export function useChronoFlow() {
   }, [timerRunning, timerEndAt]);
 
   const cancelTimerNotification = async () => {
-    if (!timerNotificationRef.current || Platform.OS === 'web') return;
+    timerNotificationGenerationRef.current += 1;
+    const notificationId = timerNotificationRef.current;
+    timerNotificationRef.current = null;
+    if (!notificationId || Platform.OS === 'web') return;
     try {
-      await Notifications.cancelScheduledNotificationAsync(timerNotificationRef.current);
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
       Alert.alert('Could not cancel timer notification', String(error));
-    } finally {
-      timerNotificationRef.current = null;
     }
   };
 
   const scheduleTimerNotification = async (date: Date) => {
     if (Platform.OS === 'web') return;
+    const generation = ++timerNotificationGenerationRef.current;
     try {
-      const permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted) return;
-      timerNotificationRef.current = await Notifications.scheduleNotificationAsync({
-        content: { title: 'Focus session complete', body: 'Your timer has finished.', sound: 'default' },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
-      });
+      const notificationId = await scheduleFocusCompletionNotificationAsync(date);
+      if (!notificationId) {
+        Alert.alert(
+          'Timer reminder unavailable',
+          'The timer will continue while the app is open, but notification permission is required for a reminder while it is in the background.',
+        );
+        return;
+      }
+      if (generation !== timerNotificationGenerationRef.current) {
+        await Notifications.cancelScheduledNotificationAsync(notificationId);
+        return;
+      }
+      timerNotificationRef.current = notificationId;
     } catch (error) {
       Alert.alert('Could not schedule timer notification', String(error));
     }
@@ -339,12 +281,12 @@ export function useChronoFlow() {
       ...current,
       alarms: current.alarms.map((alarm) => alarm.id === id ? { ...alarm, active } : alarm),
     }));
-    void syncAlarmNotifications(dataRef.current.alarms, active);
+    void syncNotifications(dataRef.current.alarms, active);
   };
 
   const deleteAlarm = (id: string) => {
     updateData((current) => ({ ...current, alarms: current.alarms.filter((alarm) => alarm.id !== id) }));
-    void syncAlarmNotifications(dataRef.current.alarms, false);
+    void syncNotifications(dataRef.current.alarms, false);
   };
 
   const resetAlarmForm = () => {
@@ -383,7 +325,7 @@ export function useChronoFlow() {
       ...(alarmDays.length === 0 ? { fireAt: nextTime(alarmTime).getTime() } : {}),
     };
     updateData((current) => ({ ...current, alarms: [...current.alarms, alarm] }));
-    void syncAlarmNotifications(dataRef.current.alarms, true);
+    void syncNotifications(dataRef.current.alarms, true);
     setModal(null);
     resetAlarmForm();
   };
@@ -473,7 +415,7 @@ export function useChronoFlow() {
     };
     setRinging(null);
     updateData((current) => ({ ...current, alarms: [...current.alarms, snooze] }));
-    void syncAlarmNotifications(dataRef.current.alarms, true);
+    void syncNotifications(dataRef.current.alarms, true);
   };
 
   const verifyMath = () => {

@@ -30,7 +30,7 @@ export function DashboardScreen({
     <View style={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>YOUR DAILY OVERVIEW</Text>
-        <Text style={styles.heroTitle}>Welcome back Asteway 👋</Text>
+        <Text style={styles.heroTitle}>Welcome back 👋</Text>
         <Text style={styles.muted}>A little structure makes room for great work.</Text>
         <View style={styles.metrics}>
           <Metric label="Done today" value={`${completedCount}/${data.tasks.length}`} color={COLORS.green} />

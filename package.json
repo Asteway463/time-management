@@ -9,6 +9,7 @@
     "expo-dev-client": "~58.0.15",
     "expo-notifications": "~58.1.6",
     "expo-status-bar": "~58.0.4",
+    "expo-system-ui": "~58.0.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -16,15 +17,23 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.3.0",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "dev": "expo start --go --tunnel",
-    "start": "expo start --go --tunnel",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web"
+    "postinstall": "patch-package",
+    "dev": "expo start --go --lan",
+    "start": "expo start --go --lan",
+    "android": "expo start --go --android",
+    "ios": "expo start --go --ios",
+    "web": "expo start --web",
+    "build": "expo export --platform web",
+    "typecheck": "tsc --noEmit",
+    "docker:dev": "docker compose up --build dev",
+    "docker:prod": "docker compose up --build web",
+    "docker:build": "docker compose build"
   },
   "engines": {
     "node": ">=22.13.0"

@@ -7,10 +7,17 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "plugins": [
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "chronoflow-alarms-v2",
+          "enableRemoteNotifications": false
+        }
+      ],
       "expo-status-bar"
     ],
     "ios": {
+      "bundleIdentifier": "com.asteway.chronoflow",
       "supportsTablet": true
     },
     "android": {
