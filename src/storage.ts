@@ -85,7 +85,7 @@ function parseMinutes(value: unknown, fallback: number): number {
 export function parseAppData(value: unknown): AppData {
   const defaults = defaultData();
   if (!isRecord(value)) {
-    throw new Error('Saved ChronoFlow data has an invalid format.');
+    throw new Error('Saved AST Time data has an invalid format.');
   }
 
   const tasks = Array.isArray(value.tasks)
@@ -95,13 +95,21 @@ export function parseAppData(value: unknown): AppData {
     ? value.alarms.map((alarm) => parseAlarm(alarm, Date.now()))
       .filter((alarm): alarm is Alarm => alarm !== null)
     : defaults.alarms;
+
   const focus = isRecord(value.focus) ? value.focus : {};
   const linkedTaskId = typeof focus.linkedTaskId === 'string' ? focus.linkedTaskId : '';
   const focusDate = typeof focus.focusDate === 'string' ? focus.focusDate : defaults.focus.focusDate;
+  const dailyGoal = typeof focus.dailyGoal === 'number'
+    && Number.isInteger(focus.dailyGoal) && focus.dailyGoal >= 0
+    ? focus.dailyGoal
+    : defaults.focus.dailyGoal;
 
   return {
     alarms,
     tasks,
+    blockedApps: defaults.blockedApps,
+    schedules: defaults.schedules,
+    focusSessions: defaults.focusSessions,
     focus: {
       workMins: parseMinutes(focus.workMins, defaults.focus.workMins),
       shortMins: parseMinutes(focus.shortMins, defaults.focus.shortMins),
@@ -113,11 +121,21 @@ export function parseAppData(value: unknown): AppData {
         : defaults.focus.totalFocusMinsToday,
       focusDate,
       linkedTaskId: tasks.some((task) => task.id === linkedTaskId) ? linkedTaskId : '',
+      dailyGoal,
     },
     streak: typeof value.streak === 'number' && Number.isInteger(value.streak) && value.streak >= 0
       ? value.streak
       : defaults.streak,
     lastStreakDate: typeof value.lastStreakDate === 'string' ? value.lastStreakDate : '',
+    theme: value.theme === 'light' || value.theme === 'dark' || value.theme === 'system'
+      ? value.theme
+      : defaults.theme,
+    timeFormat: value.timeFormat === '24h' || value.timeFormat === '12h'
+      ? value.timeFormat
+      : defaults.timeFormat,
+    notificationsEnabled: typeof value.notificationsEnabled !== 'boolean'
+      ? defaults.notificationsEnabled
+      : value.notificationsEnabled,
   };
 }
 

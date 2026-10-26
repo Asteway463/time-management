@@ -1,9 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
-import { WEEKDAYS } from '../constants';
-import { COLORS, LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE } from '../theme';
-import type { Alarm } from '../types';
+import { formatTime, WEEKDAYS } from '../constants';
+import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import type { Alarm, TimeFormat } from '../types';
 
 type Props = {
   alarms: Alarm[];
@@ -11,9 +11,12 @@ type Props = {
   onAdd: () => void;
   onToggle: (id: string, active: boolean) => void;
   onDelete: (id: string) => void;
+  timeFormat: TimeFormat;
 };
 
-export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete }: Props) {
+export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete, timeFormat }: Props) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.content}>
       <ScreenHeading
@@ -23,11 +26,15 @@ export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete }: P
       />
       <Card style={styles.nextAlarmCard}>
         <Text style={styles.eyebrow}>NEXT ALARM</Text>
-        <Text style={styles.nextAlarmTime}>{nextAlarm ? nextAlarm.alarm.time : '--:--'}</Text>
+        <Text style={styles.nextAlarmTime}>{nextAlarm ? formatTime(nextAlarm.alarm.time, timeFormat) : '--:--'}</Text>
         <Text style={styles.muted}>
           {nextAlarm ? `${nextAlarm.alarm.label} · ${nextAlarm.alarm.category}` : 'No active alarms scheduled'}
         </Text>
-        {nextAlarm && <Text style={styles.smallMuted}>At {nextAlarm.date.toLocaleString()}</Text>}
+        {nextAlarm && (
+          <Text style={styles.smallMuted}>
+            At {nextAlarm.date.toLocaleDateString()} · {formatTime(nextAlarm.alarm.time, timeFormat)}
+          </Text>
+        )}
       </Card>
       {alarms.length === 0 && <EmptyCard text="No alarms yet. Add your first alarm to get started." />}
       {alarms.map((alarm) => (
@@ -35,15 +42,15 @@ export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete }: P
           <View style={styles.rowBetween}>
             <View style={styles.flex}>
               <Text style={styles.tag}>{alarm.category}{alarm.challenge === 'math' ? ' · Math challenge' : ''}</Text>
-              <Text style={styles.alarmTime}>{alarm.time}</Text>
+              <Text style={styles.alarmTime}>{formatTime(alarm.time, timeFormat)}</Text>
               <Text style={styles.cardText}>{alarm.label}</Text>
             </View>
             <Switch
               accessibilityLabel={`Toggle ${alarm.label}`}
               value={alarm.active}
               onValueChange={(value) => onToggle(alarm.id, value)}
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={COLORS.text}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
           <View style={styles.dayRow}>
@@ -72,7 +79,7 @@ export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete }: P
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
   nextAlarmCard: { alignItems: 'center', paddingVertical: SPACE.xl },
   eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label },

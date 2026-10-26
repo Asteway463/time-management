@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { nextTime, validTime } from './constants';
-import type { Alarm } from './types';
+import { formatTime, nextTime, validTime } from './constants';
+import type { Alarm, TimeFormat } from './types';
 
 export const ALARM_CHANNEL_ID = 'chronoflow-alarms-v2';
 
@@ -79,6 +79,7 @@ function triggersForAlarm(alarm: Alarm): Notifications.NotificationTriggerInput[
 async function synchronizeAlarmNotificationsAsync(
   alarms: Alarm[],
   requestPermission: boolean,
+  timeFormat: TimeFormat,
 ): Promise<AlarmSyncResult> {
   const activeAlarms = alarms.filter((alarm) => alarm.active);
   if (activeAlarms.length === 0) {
@@ -102,7 +103,7 @@ async function synchronizeAlarmNotificationsAsync(
     for (const alarm of activeAlarms) {
       const content: Notifications.NotificationContentInput = {
         title: alarm.label || 'ChronoFlow alarm',
-        body: `${alarm.category} alarm · ${alarm.time}`,
+        body: `${alarm.category} alarm · ${formatTime(alarm.time, timeFormat)}`,
         sound: 'default',
         data: { alarmId: alarm.id },
         ...(Platform.OS === 'android' ? { channelId: ALARM_CHANNEL_ID } : {}),
@@ -129,9 +130,10 @@ async function synchronizeAlarmNotificationsAsync(
 export function syncAlarmNotificationsAsync(
   alarms: Alarm[],
   requestPermission: boolean,
+  timeFormat: TimeFormat = '24h',
 ): Promise<AlarmSyncResult> {
   const operation = alarmSyncQueue.then(
-    () => synchronizeAlarmNotificationsAsync(alarms, requestPermission),
+    () => synchronizeAlarmNotificationsAsync(alarms, requestPermission, timeFormat),
   );
   alarmSyncQueue = operation.then(() => undefined, () => undefined);
   return operation;
