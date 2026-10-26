@@ -7,10 +7,12 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import type { Alarm, Task } from '../types';
-import { COLORS, LINE_HEIGHT, RADII, SHADOWS, SPACE, TRACKING, TYPE } from '../theme';
+import { formatTime } from '../constants';
+import type { Alarm, Task, TimeFormat } from '../types';
+import { LINE_HEIGHT, RADII, SHADOWS, SPACE, TRACKING, TYPE, useThemedStyles, type ThemeColors } from '../theme';
 
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -23,6 +25,7 @@ export function ScreenHeading({
   subtitle: string;
   action?: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.screenHeading}>
       <View style={styles.screenHeadingCopy}>
@@ -35,6 +38,7 @@ export function ScreenHeading({
 }
 
 export function Metric({ label, value, color }: { label: string; value: string; color: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -43,7 +47,8 @@ export function Metric({ label, value, color }: { label: string; value: string; 
   );
 }
 
-export function LiveClock() {
+export function LiveClock({ timeFormat = '24h' }: { timeFormat?: TimeFormat }) {
+  const styles = useStyles();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30_000);
@@ -51,7 +56,11 @@ export function LiveClock() {
   }, []);
   return (
     <>
-      <Text style={styles.clock}>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</Text>
+      <Text style={styles.clock}>{now.toLocaleTimeString([], {
+        hour: timeFormat === '12h' ? 'numeric' : '2-digit',
+        minute: '2-digit',
+        hour12: timeFormat === '12h',
+      })}</Text>
       <Text style={styles.date}>{now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
     </>
   );
@@ -68,6 +77,7 @@ export function Button({
   variant?: 'primary' | 'secondary' | 'danger';
   small?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -86,13 +96,15 @@ export function Button({
 }
 
 export function EmptyCard({ text }: { text: string }) {
+  const styles = useStyles();
   return <Card><Text style={styles.emptyText}>{text}</Text></Card>;
 }
 
-export function AlarmSummary({ alarm }: { alarm: Alarm }) {
+export function AlarmSummary({ alarm, timeFormat = '24h' }: { alarm: Alarm; timeFormat?: TimeFormat }) {
+  const styles = useStyles();
   return (
     <View style={styles.summaryRow}>
-      <Text style={styles.summaryTime}>{alarm.time}</Text>
+      <Text style={styles.summaryTime}>{formatTime(alarm.time, timeFormat)}</Text>
       <View style={styles.flex}>
         <Text style={styles.cardText} numberOfLines={1}>{alarm.label}</Text>
         <Text style={styles.smallMuted}>{alarm.category}</Text>
@@ -102,7 +114,18 @@ export function AlarmSummary({ alarm }: { alarm: Alarm }) {
   );
 }
 
-export function TaskRow({ task, onToggle, onDelete }: { task: Task; onToggle: () => void; onDelete?: () => void }) {
+export function TaskRow({
+  task,
+  onToggle,
+  onDelete,
+  timeFormat = '24h',
+}: {
+  task: Task;
+  onToggle: () => void;
+  onDelete?: () => void;
+  timeFormat?: TimeFormat;
+}) {
+  const styles = useStyles();
   const priorityStyle = task.priority === 'High'
     ? styles.priorityHigh
     : task.priority === 'Medium' ? styles.priorityMedium : styles.priorityLow;
@@ -123,7 +146,7 @@ export function TaskRow({ task, onToggle, onDelete }: { task: Task; onToggle: ()
       </Pressable>
       <View style={styles.taskCopy}>
         <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]} numberOfLines={1}>{task.title}</Text>
-        <Text style={styles.smallMuted} numberOfLines={1}>{task.time} · {task.duration} min · {task.category}</Text>
+        <Text style={styles.smallMuted} numberOfLines={1}>{formatTime(task.time, timeFormat)} · {task.duration} min · {task.category}</Text>
       </View>
       <View style={[styles.priority, priorityStyle]}>
         <Text style={[styles.priorityText, priorityTextStyle]}>{task.priority}</Text>
@@ -144,10 +167,12 @@ export function TaskRow({ task, onToggle, onDelete }: { task: Task; onToggle: ()
 }
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useStyles();
   return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text>{children}</View>;
 }
 
 export function ModalHeading({ title, onClose }: { title: string; onClose: () => void }) {
+  const styles = useStyles();
   return (
     <View style={styles.rowBetween}>
       <Text style={styles.modalTitle}>{title}</Text>
@@ -171,6 +196,7 @@ export function ChoiceRow<T extends string>({
   labels?: Record<string, string>;
   equal?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.choices}>
       {values.map((value) => {
@@ -191,7 +217,11 @@ export function ChoiceRow<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+function useStyles() {
+  return useThemedStyles(createStyles);
+}
+
+const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   card: {
     padding: SPACE.lg,
     backgroundColor: COLORS.surface,

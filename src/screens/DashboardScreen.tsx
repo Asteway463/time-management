@@ -2,8 +2,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AlarmSummary, Button, Card, Metric, TaskRow } from '../components/Common';
 import { formatDuration } from '../constants';
-import { COLORS, LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE } from '../theme';
-import type { Alarm, AppData, Tab } from '../types';
+import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import type { Alarm, AppData, Tab, TimeFormat } from '../types';
 
 type Props = {
   data: AppData;
@@ -14,6 +14,7 @@ type Props = {
   onAddAlarm: () => void;
   onAddTask: () => void;
   onToggleTask: (id: string) => void;
+  timeFormat: TimeFormat;
 };
 
 export function DashboardScreen({
@@ -25,7 +26,10 @@ export function DashboardScreen({
   onAddAlarm,
   onAddTask,
   onToggleTask,
+  timeFormat,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.content}>
       <View style={styles.hero}>
@@ -33,10 +37,10 @@ export function DashboardScreen({
         <Text style={styles.heroTitle}>Welcome back 👋</Text>
         <Text style={styles.muted}>A little structure makes room for great work.</Text>
         <View style={styles.metrics}>
-          <Metric label="Done today" value={`${completedCount}/${data.tasks.length}`} color={COLORS.green} />
-          <Metric label="Focus time" value={formatDuration(data.focus.totalFocusMinsToday)} color={COLORS.primary} />
-          <Metric label="Alarms" value={`${activeAlarms.length}`} color={COLORS.amber} />
-          <Metric label="Progress" value={`${progress}%`} color={COLORS.green} />
+          <Metric label="Done today" value={`${completedCount}/${data.tasks.length}`} color={colors.green} />
+          <Metric label="Focus time" value={formatDuration(data.focus.totalFocusMinsToday)} color={colors.primary} />
+          <Metric label="Alarms" value={`${activeAlarms.length}`} color={colors.amber} />
+          <Metric label="Progress" value={`${progress}%`} color={colors.green} />
         </View>
       </View>
       <Card>
@@ -55,29 +59,29 @@ export function DashboardScreen({
       <Card>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Upcoming alarms</Text>
-          <Pressable accessibilityRole="button" onPress={() => onNavigate('alarms')}><Text style={styles.link}>Manage</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={onAddAlarm}><Text style={styles.link}>Manage</Text></Pressable>
         </View>
-        {activeAlarms.slice(0, 3).map((alarm) => <AlarmSummary key={alarm.id} alarm={alarm} />)}
-        {activeAlarms.length === 0 && <Text style={styles.emptyText}>No alarms set yet.</Text>}
+        {activeAlarms.slice(0, 3).map((alarm) => <AlarmSummary key={alarm.id} alarm={alarm} timeFormat={timeFormat} />)}
+        {activeAlarms.length === 0 && <Text style={styles.emptyText}>No alarms set yet</Text>}
         <Button title="+ Set an alarm" onPress={onAddAlarm} variant="secondary" />
       </Card>
       <Card>
         <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>Today’s tasks</Text>
-          <Pressable accessibilityRole="button" onPress={() => onNavigate('tasks')}><Text style={styles.link}>Open planner</Text></Pressable>
+          <Text style={styles.cardTitle}>Today’s tasks..</Text>
+          <Pressable accessibilityRole="button" onPress={() => onNavigate('home')}><Text style={styles.link}>Open planner</Text></Pressable>
         </View>
         {data.tasks.slice(0, 3).map((task) => (
-          <TaskRow key={task.id} task={task} onToggle={() => onToggleTask(task.id)} />
+          <TaskRow key={task.id} task={task} onToggle={() => onToggleTask(task.id)} timeFormat={timeFormat} />
         ))}
-        {data.tasks.length === 0 && <Text style={styles.emptyText}>Your schedule is clear. Add a task to get started.</Text>}
+        {data.tasks.length === 0 && <Text style={styles.emptyText}>Your schedule is clear. Add a task to get started..</Text>}
         <Button title="+ Schedule a task" onPress={onAddTask} variant="secondary" />
       </Card>
-      <Text style={styles.streak}>🔥  {data.streak}-day streak</Text>
+      <Text style={styles.streak}> streak 🔥  {data.streak} day of streak </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
   hero: {
     padding: SPACE.xl,

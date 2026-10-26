@@ -1,7 +1,35 @@
-export type Tab = 'dashboard' | 'alarms' | 'tasks' | 'focus';
+export type Tab = 'home' | 'focus' | 'blocking' | 'stats' | 'settings';
+
 export type Category = 'Work' | 'Study' | 'Exercise' | 'Rest';
 export type Priority = 'High' | 'Medium' | 'Low';
 export type FocusMode = 'work' | 'shortBreak' | 'longBreak';
+export type TimeFormat = '12h' | '24h';
+
+export type BlockSchedule = {
+  id: string;
+  startTime: string;
+  endTime: string;
+  days: number[];
+  enabled: boolean;
+};
+
+export type BlockedApp = {
+  packageName: string;
+  label: string;
+  dailyLimitMinutes: number;
+  blockDuringFocus: boolean;
+  scheduleIds: string[];
+};
+
+export type FocusSession = {
+  id: string;
+  startedAt: number;
+  endedAt: number | null;
+  duration: number;
+  mode: FocusMode;
+  blockedApps: string[];
+  completed: boolean;
+};
 
 export type Alarm = {
   id: string;
@@ -27,6 +55,9 @@ export type Task = {
 export type AppData = {
   alarms: Alarm[];
   tasks: Task[];
+  blockedApps: BlockedApp[];
+  schedules: BlockSchedule[];
+  focusSessions: FocusSession[];
   focus: {
     workMins: number;
     shortMins: number;
@@ -34,7 +65,11 @@ export type AppData = {
     totalFocusMinsToday: number;
     focusDate: string;
     linkedTaskId: string;
+    dailyGoal: number;
   };
   streak: number;
   lastStreakDate: string;
+  theme: 'light' | 'dark' | 'system';
+  timeFormat: TimeFormat;
+  notificationsEnabled: boolean;
 };

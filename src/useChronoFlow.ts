@@ -7,7 +7,18 @@ import {
   syncAlarmNotificationsAsync,
 } from './notifications';
 import { loadAppData, saveAppData } from './storage';
-import type { Alarm, AppData, Category, FocusMode, Priority, Tab, Task } from './types';
+import type {
+  Alarm,
+  AppData,
+  BlockSchedule,
+  BlockedApp,
+  Category,
+  FocusMode,
+  Priority,
+  Tab,
+  Task,
+  TimeFormat,
+} from './types';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -21,7 +32,7 @@ Notifications.setNotificationHandler({
 export function useChronoFlow() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>('home');
   const [filter, setFilter] = useState<Category | 'All'>('All');
   const [modal, setModal] = useState<'alarm' | 'task' | 'settings' | null>(null);
   const [ringing, setRinging] = useState<Alarm | null>(null);
@@ -43,6 +54,14 @@ export function useChronoFlow() {
   const [remaining, setRemaining] = useState(25 * 60);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerEndAt, setTimerEndAt] = useState<number | null>(null);
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [addAppModal, setAddAppModal] = useState(false);
+  const [addScheduleModal, setAddScheduleModal] = useState(false);
+  const [newAppPackage, setNewAppPackage] = useState('');
+  const [newAppLabel, setNewAppLabel] = useState('');
+  const [newScheduleStart, setNewScheduleStart] = useState('21:00');
+  const [newScheduleEnd, setNewScheduleEnd] = useState('23:00');
+  const [newScheduleDays, setNewScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const lastFiredRef = useRef('');
   const timerNotificationRef = useRef<string | null>(null);
   const timerNotificationGenerationRef = useRef(0);
@@ -72,7 +91,7 @@ export function useChronoFlow() {
   const syncNotifications = useCallback(async (alarms: Alarm[], askPermission: boolean) => {
     if (Platform.OS === 'web') return;
     try {
-      const result = await syncAlarmNotificationsAsync(alarms, askPermission);
+      const result = await syncAlarmNotificationsAsync(alarms, askPermission, dataRef.current.timeFormat);
       if (result === 'permission-denied' && askPermission) {
         Alert.alert(
           'Notifications are off',
@@ -454,6 +473,96 @@ export function useChronoFlow() {
     .filter((item): item is { alarm: Alarm; date: Date } => item.date !== null)
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
 
+  const addBlockedApp = () => {
+    if (!newAppPackage.trim() || !newAppLabel.trim()) {
+      Alert.alert('Add an app', 'Enter both the package name and display label.');
+      return;
+    }
+    const app: BlockedApp = {
+      packageName: newAppPackage.trim(),
+      label: newAppLabel.trim(),
+      dailyLimitMinutes: 60,
+      blockDuringFocus: true,
+      scheduleIds: [],
+    };
+    updateData((current) => ({ ...current, blockedApps: [...current.blockedApps, app] }));
+    setNewAppPackage('');
+    setNewAppLabel('');
+    setAddAppModal(false);
+  };
+
+  const removeBlockedApp = (packageName: string) => {
+    updateData((current) => ({
+      ...current,
+      blockedApps: current.blockedApps.filter((app) => app.packageName !== packageName),
+    }));
+  };
+
+  const toggleBlockedApp = (packageName: string, blockDuringFocus: boolean) => {
+    updateData((current) => ({
+      ...current,
+      blockedApps: current.blockedApps.map((app) =>
+        app.packageName === packageName ? { ...app, blockDuringFocus } : app,
+      ),
+    }));
+  };
+
+  const addSchedule = () => {
+    if (!validTime(newScheduleStart) || !validTime(newScheduleEnd)) {
+      Alert.alert('Check times', 'Use a valid 24-hour format, for example 21:00.');
+      return;
+    }
+    const schedule: BlockSchedule = {
+      id: `schedule-${Date.now()}`,
+      startTime: newScheduleStart,
+      endTime: newScheduleEnd,
+      days: newScheduleDays,
+      enabled: true,
+    };
+    updateData((current) => ({ ...current, schedules: [...current.schedules, schedule] }));
+    setNewScheduleDays([1, 2, 3, 4, 5]);
+    setAddScheduleModal(false);
+  };
+
+  const removeSchedule = (id: string) => {
+    updateData((current) => ({ ...current, schedules: current.schedules.filter((s) => s.id !== id) }));
+  };
+
+  const toggleSchedule = (id: string, enabled: boolean) => {
+    updateData((current) => ({
+      ...current,
+      schedules: current.schedules.map((s) => (s.id === id ? { ...s, enabled } : s)),
+    }));
+  };
+
+  const toggleNotifications = (enabled: boolean) => {
+    updateData((current) => ({ ...current, notificationsEnabled: enabled }));
+  };
+
+  const setTheme = (theme: 'light' | 'dark' | 'system') => {
+    updateData((current) => ({ ...current, theme }));
+  };
+
+  const setTimeFormat = (timeFormat: TimeFormat) => {
+    updateData((current) => ({ ...current, timeFormat }));
+    void syncNotifications(dataRef.current.alarms, false);
+  };
+
+  const clearAllData = () => {
+    updateData(() => defaultData());
+  };
+
+  const exportData = () => {
+    Alert.alert('Export', 'Data export is not implemented yet. Use the storage key "asttime-state-v1" to locate your data.');
+  };
+
+  const openPermissions = () => {
+    Alert.alert(
+      'Enable accessibility service',
+      'Go to Settings > Accessibility > AST Time Focus Blocker and turn it on.',
+    );
+  };
+
   return {
     data,
     loaded,
@@ -493,6 +602,7 @@ export function useChronoFlow() {
     focusMode,
     remaining,
     timerRunning,
+    isBlocking,
     activeAlarms,
     completedCount,
     progress,
@@ -515,5 +625,31 @@ export function useChronoFlow() {
     dismissAlarm,
     snoozeAlarm,
     verifyMath,
+    addBlockedApp,
+    removeBlockedApp,
+    toggleBlockedApp,
+    addSchedule,
+    removeSchedule,
+    toggleSchedule,
+    toggleNotifications,
+    setTheme,
+    setTimeFormat,
+    clearAllData,
+    exportData,
+    openPermissions,
+    openAddAppModal: () => setAddAppModal(true),
+    openAddScheduleModal: () => setAddScheduleModal(true),
+    addAppModal,
+    addScheduleModal,
+    newAppPackage,
+    setNewAppPackage,
+    newAppLabel,
+    setNewAppLabel,
+    newScheduleStart,
+    setNewScheduleStart,
+    newScheduleEnd,
+    setNewScheduleEnd,
+    newScheduleDays,
+    setNewScheduleDays,
   };
 }

@@ -35,6 +35,8 @@ The web preview is available at `http://localhost:8080` (or the port set by `POR
 
 Tasks, alarms, and timer settings are stored on the device. Alarm notifications require notification permission. As with other scheduled notifications, delivery and sound can be affected by device focus, battery, and operating-system settings; this app does not yet provide a guaranteed full-screen system-clock alarm.
 
+Settings include dark, light, and automatic appearance (which follows the device), plus 12-hour AM/PM or 24-hour time display. Time entry fields accept 24-hour values; display preferences are saved on the device.
+
 ## Android notifications
 
 Android requires an alarm notification channel to exist before reminders are scheduled. The channel now supplies explicit audio attributes when enabling its default sound; omitting them caused the Android null-pointer error in `setNotificationChannelAsync`. The channel ID is `chronoflow-alarms-v2` so Android does not reuse an older channel with immutable settings. If notification permission is denied, alarms remain saved but Android will not deliver them.

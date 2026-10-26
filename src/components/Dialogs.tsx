@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Button, ChoiceRow, Field, ModalHeading } from './Common';
-import { CATEGORIES, WEEKDAY_NAMES, WEEKDAYS } from '../constants';
-import { COLORS, LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE } from '../theme';
-import type { Alarm, Category, Priority } from '../types';
+import { CATEGORIES, formatTime, WEEKDAY_NAMES, WEEKDAYS } from '../constants';
+import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import type { Alarm, Category, Priority, TimeFormat } from '../types';
 
 type AlarmFormProps = {
   visible: boolean;
@@ -32,14 +32,16 @@ type AlarmFormProps = {
 };
 
 export function AlarmFormModal(props: AlarmFormProps) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <FormModal visible={props.visible} onClose={props.onClose}>
       <ModalHeading title="Create an alarm" onClose={props.onClose} />
       <Field label="Alarm name">
-        <TextInput accessibilityLabel="Alarm name" value={props.label} onChangeText={props.setLabel} placeholder="Morning routine" placeholderTextColor={COLORS.muted} style={styles.input} maxLength={60} />
+        <TextInput accessibilityLabel="Alarm name" value={props.label} onChangeText={props.setLabel} placeholder="Morning routine" placeholderTextColor={colors.muted} style={styles.input} maxLength={60} />
       </Field>
       <Field label="Time (24-hour)">
-        <TextInput accessibilityLabel="Alarm time, 24-hour" value={props.time} onChangeText={props.setTime} placeholder="07:30" placeholderTextColor={COLORS.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
+        <TextInput accessibilityLabel="Alarm time, 24-hour" value={props.time} onChangeText={props.setTime} placeholder="07:30" placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
       </Field>
       <Field label="Category">
         <ChoiceRow<Alarm['category']> values={['Personal', ...CATEGORIES]} selected={props.category} onSelect={props.setCategory} />
@@ -85,16 +87,18 @@ type TaskFormProps = {
 };
 
 export function TaskFormModal(props: TaskFormProps) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <FormModal visible={props.visible} onClose={props.onClose}>
       <ModalHeading title="Schedule a task" onClose={props.onClose} />
       <Field label="Task title">
-        <TextInput accessibilityLabel="Task title" value={props.title} onChangeText={props.setTitle} placeholder="What needs your attention?" placeholderTextColor={COLORS.muted} style={styles.input} maxLength={100} />
+        <TextInput accessibilityLabel="Task title" value={props.title} onChangeText={props.setTitle} placeholder="What needs your attention?" placeholderTextColor={colors.muted} style={styles.input} maxLength={100} />
       </Field>
       <View style={styles.rowGap}>
         <View style={styles.flex}>
           <Field label="Start time">
-            <TextInput accessibilityLabel="Task start time, 24-hour" value={props.time} onChangeText={props.setTime} placeholder="09:00" placeholderTextColor={COLORS.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
+            <TextInput accessibilityLabel="Task start time, 24-hour" value={props.time} onChangeText={props.setTime} placeholder="09:00" placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
           </Field>
         </View>
         <View style={styles.flex}>
@@ -127,6 +131,7 @@ export function TimerSettingsModal({
   settings: { work: string; short: string; long: string };
   setSettings: React.Dispatch<React.SetStateAction<{ work: string; short: string; long: string }>>;
 }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <FormModal visible={visible} onClose={onClose}>
       <ModalHeading title="Timer settings" onClose={onClose} />
@@ -153,6 +158,7 @@ export function RingingAlarmModal({
   onVerify,
   onDismiss,
   onSnooze,
+  timeFormat = '24h',
 }: {
   alarm: Alarm | null;
   mathQuestion: string;
@@ -162,7 +168,10 @@ export function RingingAlarmModal({
   onVerify: () => void;
   onDismiss: () => void;
   onSnooze: () => void;
+  timeFormat?: TimeFormat;
 }) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <Modal visible={alarm !== null} animationType="fade" transparent onRequestClose={onDismiss}>
       <View style={styles.ringBackdrop}>
@@ -171,7 +180,7 @@ export function RingingAlarmModal({
             <Text style={styles.ringIcon}>◉</Text>
             <Text style={styles.eyebrow}>{alarm?.category.toUpperCase()} ALARM</Text>
             <Text style={styles.ringTitle}>{alarm?.label}</Text>
-            <Text style={styles.ringTime}>{alarm?.time}</Text>
+            <Text style={styles.ringTime}>{alarm ? formatTime(alarm.time, timeFormat) : ''}</Text>
             {alarm?.challenge === 'math' ? (
               <>
                 <Text style={styles.muted}>Solve this to dismiss</Text>
@@ -182,7 +191,7 @@ export function RingingAlarmModal({
                   onChangeText={setMathInput}
                   keyboardType="number-pad"
                   placeholder="Answer"
-                  placeholderTextColor={COLORS.muted}
+                  placeholderTextColor={colors.muted}
                   style={styles.input}
                 />
                 {mathError && <Text style={styles.errorText}>Not quite — try again.</Text>}
@@ -200,6 +209,7 @@ export function RingingAlarmModal({
 }
 
 function FormModal({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -212,6 +222,7 @@ function FormModal({ visible, onClose, children }: { visible: boolean; onClose: 
 }
 
 function ModalActions({ onCancel, onSave, saveLabel }: { onCancel: () => void; onSave: () => void; saveLabel: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.modalActions}>
       <View style={styles.actionButton}><Button title="Cancel" variant="secondary" onPress={onCancel} /></View>
@@ -220,7 +231,7 @@ function ModalActions({ onCancel, onSave, saveLabel }: { onCancel: () => void; o
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: COLORS.overlay },
   modalScroll: { width: '100%', maxWidth: LAYOUT.modalMaxWidth, maxHeight: '92%', alignSelf: 'center' },
   modalScrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
