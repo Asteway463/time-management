@@ -104,3 +104,18 @@ class BlockAccessibilityService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_HOME)
     }
 }
+
+class BootReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: android.content.Context, intent: android.content.Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action == android.content.Intent.ACTION_BOOT_COMPLETED ||
+            action == android.content.Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
+            val scheduled = android.content.Intent(context, BlockSchedulerService::class.java).apply {
+                this.action = BlockSchedulerService.ACTION_RECHECK
+            }
+            context.startService(scheduled)
+        }
+    }
+}
