@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'focus' | 'blocking' | 'stats' | 'settings';
+export type Tab = 'home' | 'planner' | 'focus' | 'alarms' | 'blocking' | 'stats' | 'settings';
 export type Category = 'Work' | 'Study' | 'Exercise' | 'Rest';
 export type Priority = 'High' | 'Medium' | 'Low';
 export type FocusMode = 'work' | 'shortBreak' | 'longBreak';

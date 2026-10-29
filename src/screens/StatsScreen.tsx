@@ -19,7 +19,9 @@ export function StatsScreen({ data, sessions }: Props) {
     .filter((s) => s.startedAt > Date.now() - 7 * 24 * 60 * 60 * 1000)
     .reduce((sum, s) => sum + s.duration, 0);
 
-  const goalProgress = Math.min(100, Math.round((data.focus.totalFocusMinsToday / data.focus.dailyGoal) * 100));
+  const goalProgress = data.focus.dailyGoal > 0
+    ? Math.min(100, Math.round((data.focus.totalFocusMinsToday / data.focus.dailyGoal) * 100))
+    : 0;
 
   return (
     <View style={styles.content}>

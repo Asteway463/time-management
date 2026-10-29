@@ -11,6 +11,7 @@ type Props = {
   progress: number;
   onNavigate: (tab: Tab) => void;
   onAddTask: () => void;
+  onAddAlarm: () => void;
   onToggleTask: (id: string) => void;
   onQuickFocus: () => void;
   timeFormat: TimeFormat;
@@ -22,13 +23,16 @@ export function HomeScreen({
   progress,
   onNavigate,
   onAddTask,
+  onAddAlarm,
   onToggleTask,
   onQuickFocus,
   timeFormat,
 }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
-  const goalProgress = Math.min(100, Math.round((data.focus.totalFocusMinsToday / data.focus.dailyGoal) * 100));
+  const goalProgress = data.focus.dailyGoal > 0
+    ? Math.min(100, Math.round((data.focus.totalFocusMinsToday / data.focus.dailyGoal) * 100))
+    : 0;
   const hasTasks = data.tasks.length > 0;
 
   return (
@@ -73,6 +77,7 @@ export function HomeScreen({
           <Text style={styles.cardTitle}>Quick actions</Text>
         </View>
         <Button title="Start Focus Timer" onPress={() => onNavigate('focus')} variant="secondary" />
+        <Button title="Set an alarm" onPress={onAddAlarm} variant="secondary" />
       </Card>
 
       <Text style={styles.streak}>🔥 {data.streak} day streak</Text>

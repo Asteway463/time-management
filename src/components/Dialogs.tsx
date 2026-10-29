@@ -118,6 +118,65 @@ export function TaskFormModal(props: TaskFormProps) {
   );
 }
 
+export function ScheduleFormModal({
+  visible,
+  onClose,
+  onSave,
+  startTime,
+  setStartTime,
+  endTime,
+  setEndTime,
+  days,
+  setDays,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  startTime: string;
+  setStartTime: (value: string) => void;
+  endTime: string;
+  setEndTime: (value: string) => void;
+  days: number[];
+  setDays: React.Dispatch<React.SetStateAction<number[]>>;
+}) {
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <FormModal visible={visible} onClose={onClose}>
+      <ModalHeading title="Add a blocking schedule" onClose={onClose} />
+      <View style={styles.rowGap}>
+        <View style={styles.flex}>
+          <Field label="Start time (24-hour)">
+            <TextInput accessibilityLabel="Schedule start time, 24-hour" value={startTime} onChangeText={setStartTime} placeholder="21:00" placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
+          </Field>
+        </View>
+        <View style={styles.flex}>
+          <Field label="End time (24-hour)">
+            <TextInput accessibilityLabel="Schedule end time, 24-hour" value={endTime} onChangeText={setEndTime} placeholder="23:00" placeholderTextColor={colors.muted} keyboardType="numbers-and-punctuation" style={styles.input} maxLength={5} />
+          </Field>
+        </View>
+      </View>
+      <Field label="Repeat days">
+        <View style={styles.dayChoiceRow}>
+          {WEEKDAYS.map((day, index) => (
+            <Pressable
+              key={`${day}-${index}`}
+              accessibilityRole="checkbox"
+              accessibilityLabel={WEEKDAY_NAMES[index]}
+              accessibilityState={{ checked: days.includes(index) }}
+              onPress={() => setDays((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index])}
+              style={({ pressed }) => [styles.dayChoice, days.includes(index) && styles.dayChoiceActive, pressed && styles.pressed]}
+            >
+              <Text style={[styles.dayText, days.includes(index) && styles.dayTextActive]}>{day}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Field>
+      <ModalActions onCancel={onClose} onSave={onSave} saveLabel="Save schedule" />
+    </FormModal>
+  );
+}
+
 export function TimerSettingsModal({
   visible,
   onClose,
@@ -208,6 +267,75 @@ export function RingingAlarmModal({
   );
 }
 
+export function AppPickerModal({
+  visible,
+  onClose,
+  onSelect,
+  apps,
+  loading,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (packageName: string, label: string) => void;
+  apps: { packageName: string; label: string }[];
+  loading: boolean;
+}) {
+  const [search, setSearch] = React.useState('');
+  const colors = useThemeColors();
+  const styles = useThemedStyles(createStyles);
+  const filtered = apps.filter(app =>
+    app.label.toLowerCase().includes(search.toLowerCase()) ||
+    app.packageName.toLowerCase().includes(search.toLowerCase())
+  ).sort((a, b) => a.label.localeCompare(b.label));
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.modalCard, { height: '80%', paddingBottom: 0 }]}>
+          <ModalHeading title="Select an app to block" onClose={onClose} />
+          <TextInput
+            placeholder="Search apps..."
+            placeholderTextColor={colors.muted}
+            value={search}
+            onChangeText={setSearch}
+            style={[styles.input, { marginBottom: SPACE.md }]}
+          />
+          {loading ? (
+            <Text style={styles.muted}>Loading installed apps...</Text>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: SPACE.xl }}>
+              {filtered.length === 0 && (
+                <Text style={styles.muted}>No apps found. Try a different search.</Text>
+              )}
+              {filtered.map(app => (
+                <Pressable
+                  key={app.packageName}
+                  style={({ pressed }) => [styles.appPickerRow, pressed && styles.pressed]}
+                  onPress={() => {
+                    onSelect(app.packageName, app.label);
+                    onClose();
+                  }}
+                >
+                  <View style={styles.appIconPlaceholder}>
+                    <Text style={styles.appIconText}>{app.label.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.appLabel}>{app.label}</Text>
+                    <Text style={styles.appMeta}>{app.packageName}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+          <View style={{ paddingVertical: SPACE.md }}>
+            <Button title="Close" variant="secondary" onPress={onClose} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function FormModal({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const styles = useThemedStyles(createStyles);
   return (
@@ -255,6 +383,11 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   ringTitle: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800', textAlign: 'center' },
   ringTime: { color: COLORS.red, fontSize: TYPE.timer, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body, textAlign: 'center' },
+  appPickerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingVertical: SPACE.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  appIconPlaceholder: { width: 40, height: 40, borderRadius: RADII.sm, backgroundColor: COLORS.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
+  appIconText: { color: COLORS.primaryStrong, fontWeight: '800', fontSize: TYPE.bodyLarge },
+  appLabel: { color: COLORS.text, fontSize: TYPE.body, fontWeight: '600' },
+  appMeta: { color: COLORS.muted, fontSize: TYPE.caption },
   mathQuestion: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800', textAlign: 'center' },
   errorText: { color: COLORS.red, textAlign: 'center', fontSize: TYPE.small },
 });

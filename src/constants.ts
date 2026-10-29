@@ -7,7 +7,9 @@ export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thurs
 export const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 export const TAB_LABELS: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
+  { id: 'planner', label: 'Planner' },
   { id: 'focus', label: 'Focus' },
+  { id: 'alarms', label: 'Alarms' },
   { id: 'blocking', label: 'Blocking' },
   { id: 'stats', label: 'Stats' },
   { id: 'settings', label: 'Settings' },
@@ -73,8 +75,9 @@ export const nextAlarmDate = (alarm: Alarm) => {
 };
 
 export const formatDuration = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
   return hours ? `${hours}h ${rest}m` : `${rest}m`;
 };
 

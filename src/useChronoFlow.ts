@@ -1,11 +1,20 @@
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Platform } from 'react-native';
+import { Alert, AppState, Platform, Share } from 'react-native';
 import { defaultData, nextAlarmDate, nextTime, todayKey, validTime } from './constants';
 import {
   scheduleFocusCompletionNotificationAsync,
   syncAlarmNotificationsAsync,
 } from './notifications';
+import {
+  clearNativeBlockState,
+  getInstalledApps,
+  isAccessibilityEnabled as checkAccessibility,
+  isNativeBlockingAvailable,
+  openAccessibilitySettings,
+  setNativeBlockState,
+  type InstalledApp,
+} from './services/appBlocking';
 import { loadAppData, saveAppData } from './storage';
 import type {
   Alarm,
@@ -14,6 +23,7 @@ import type {
   BlockedApp,
   Category,
   FocusMode,
+  FocusSession,
   Priority,
   Tab,
   Task,
@@ -29,12 +39,38 @@ Notifications.setNotificationHandler({
   }),
 });
 
+function getActiveScheduleEnd(schedules: BlockSchedule[], now: Date): number | null {
+  let earliestEnd: number | null = null;
+  for (const schedule of schedules) {
+    if (!schedule.enabled || schedule.days.length === 0) continue;
+    const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
+    const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
+    if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) continue;
+
+    const start = new Date(now);
+    start.setHours(startHour, startMinute, 0, 0);
+    if (start.getTime() > now.getTime()) start.setDate(start.getDate() - 1);
+
+    const end = new Date(start);
+    end.setHours(endHour, endMinute, 0, 0);
+    if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1);
+
+    const isActive = schedule.days.includes(start.getDay())
+      && now.getTime() >= start.getTime()
+      && now.getTime() < end.getTime();
+    if (isActive && (earliestEnd === null || end.getTime() < earliestEnd)) {
+      earliestEnd = end.getTime();
+    }
+  }
+  return earliestEnd;
+}
+
 export function useChronoFlow() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>('home');
   const [filter, setFilter] = useState<Category | 'All'>('All');
-  const [modal, setModal] = useState<'alarm' | 'task' | 'settings' | null>(null);
+  const [modal, setModal] = useState<'alarm' | 'task' | 'settings' | 'appPicker' | 'schedule' | null>(null);
   const [ringing, setRinging] = useState<Alarm | null>(null);
   const [mathQuestion, setMathQuestion] = useState({ text: '', answer: 0 });
   const [mathInput, setMathInput] = useState('');
@@ -55,6 +91,9 @@ export function useChronoFlow() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerEndAt, setTimerEndAt] = useState<number | null>(null);
   const [isBlocking, setIsBlocking] = useState(false);
+  const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
+  const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
+  const [loadingApps, setLoadingApps] = useState(false);
   const [addAppModal, setAddAppModal] = useState(false);
   const [addScheduleModal, setAddScheduleModal] = useState(false);
   const [newAppPackage, setNewAppPackage] = useState('');
@@ -90,9 +129,14 @@ export function useChronoFlow() {
 
   const syncNotifications = useCallback(async (alarms: Alarm[], askPermission: boolean) => {
     if (Platform.OS === 'web') return;
+    const notificationsEnabled = dataRef.current.notificationsEnabled;
     try {
-      const result = await syncAlarmNotificationsAsync(alarms, askPermission, dataRef.current.timeFormat);
-      if (result === 'permission-denied' && askPermission) {
+      const result = await syncAlarmNotificationsAsync(
+        notificationsEnabled ? alarms : [],
+        askPermission && notificationsEnabled,
+        dataRef.current.timeFormat,
+      );
+      if (result === 'permission-denied' && askPermission && notificationsEnabled) {
         Alert.alert(
           'Notifications are off',
           'The alarm is saved, but it will not notify you until notification permission is enabled in system settings.',
@@ -128,6 +172,50 @@ export function useChronoFlow() {
     if (!loaded) return;
     void syncNotifications(dataRef.current.alarms, false);
   }, [loaded, syncNotifications]);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const enabled = await checkAccessibility();
+      setAccessibilityEnabled(enabled);
+    };
+    checkAccess();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkAccess();
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded || timerRunning) return;
+    if (Platform.OS !== 'android' || !isNativeBlockingAvailable()) return;
+
+    const applySchedules = () => {
+      const packages = dataRef.current.blockedApps
+        .filter((app) => app.blockDuringFocus)
+        .map((app) => app.packageName);
+      const endAt = accessibilityEnabled
+        ? getActiveScheduleEnd(dataRef.current.schedules, new Date())
+        : null;
+
+      if (endAt !== null && packages.length > 0) {
+        setNativeBlockState(packages, 'Scheduled focus block', endAt);
+        setIsBlocking(true);
+      } else {
+        clearNativeBlockState();
+        setIsBlocking(false);
+      }
+    };
+
+    applySchedules();
+    const interval = setInterval(applySchedules, 60_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') applySchedules();
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [loaded, timerRunning, accessibilityEnabled, data.schedules, data.blockedApps]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -218,7 +306,7 @@ export function useChronoFlow() {
   };
 
   const scheduleTimerNotification = async (date: Date) => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !dataRef.current.notificationsEnabled) return;
     const generation = ++timerNotificationGenerationRef.current;
     try {
       const notificationId = await scheduleFocusCompletionNotificationAsync(date);
@@ -243,15 +331,30 @@ export function useChronoFlow() {
     if (!timerRunning || remaining > 0) return;
     setTimerRunning(false);
     setTimerEndAt(null);
+    clearNativeBlockState();
+    setIsBlocking(false);
     void cancelTimerNotification();
     if (focusMode === 'work') {
       const elapsedMinutes = focusSessionStartedAtRef.current === null
         ? dataRef.current.focus.workMins
         : Math.min(dataRef.current.focus.workMins, (Date.now() - focusSessionStartedAtRef.current) / 60_000);
+      const blockedApps = dataRef.current.blockedApps
+        .filter((app) => app.blockDuringFocus)
+        .map((app) => app.packageName);
+      const session: FocusSession = {
+        id: `focus-${Date.now()}`,
+        startedAt: Date.now() - Math.round(elapsedMinutes * 60_000),
+        endedAt: Date.now(),
+        duration: Math.round(elapsedMinutes),
+        mode: 'work',
+        blockedApps,
+        completed: true,
+      };
       focusSessionStartedAtRef.current = null;
       updateData((current) => ({
         ...current,
         focus: { ...current.focus, totalFocusMinsToday: current.focus.totalFocusMinsToday + elapsedMinutes },
+        focusSessions: [session, ...current.focusSessions].slice(0, 200),
       }));
       Alert.alert('Focus session complete', 'Great work. Time for a break.');
     } else {
@@ -260,14 +363,37 @@ export function useChronoFlow() {
     }
   }, [remaining, timerRunning, focusMode, updateData]);
 
-  const startFocusTimer = () => {
-    const endAt = Date.now() + remaining * 1000;
-    if (focusMode === 'work' && focusSessionStartedAtRef.current === null) {
-      focusSessionStartedAtRef.current = Date.now();
+  const startTimerForMode = (mode: FocusMode, seconds: number) => {
+    const durationSeconds = Math.max(1, Math.round(seconds));
+    const endAt = Date.now() + durationSeconds * 1000;
+    if (mode === 'work') {
+      if (focusSessionStartedAtRef.current === null) {
+        focusSessionStartedAtRef.current = Date.now();
+      }
+      const blockedPackages = dataRef.current.blockedApps
+        .filter((app) => app.blockDuringFocus)
+        .map((app) => app.packageName);
+      if (blockedPackages.length > 0 && accessibilityEnabled) {
+        setNativeBlockState(blockedPackages, 'Focus session active', endAt);
+        setIsBlocking(true);
+      }
     }
+    setFocusMode(mode);
+    setRemaining(durationSeconds);
     setTimerEndAt(endAt);
     setTimerRunning(true);
     void scheduleTimerNotification(new Date(endAt));
+  };
+
+  const startFocusTimer = () => {
+    const minutes = focusMode === 'work' ? data.focus.workMins
+      : focusMode === 'shortBreak' ? data.focus.shortMins : data.focus.longMins;
+    startTimerForMode(focusMode, remaining > 0 ? remaining : minutes * 60);
+  };
+
+  const startQuickFocus = () => {
+    if (timerRunning) pauseFocusTimer();
+    startTimerForMode('work', dataRef.current.focus.workMins * 60);
   };
 
   const pauseFocusTimer = () => {
@@ -284,6 +410,8 @@ export function useChronoFlow() {
     }
     setTimerRunning(false);
     setTimerEndAt(null);
+    clearNativeBlockState();
+    setIsBlocking(false);
     void cancelTimerNotification();
   };
 
@@ -473,6 +601,45 @@ export function useChronoFlow() {
     .filter((item): item is { alarm: Alarm; date: Date } => item.date !== null)
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
 
+  const fetchApps = async () => {
+    setLoadingApps(true);
+    try {
+      const apps = await getInstalledApps();
+      setInstalledApps(apps);
+    } catch (error) {
+      Alert.alert('Could not get apps', String(error));
+    } finally {
+      setLoadingApps(false);
+    }
+  };
+
+  const openAddAppPicker = () => {
+    if (!isNativeBlockingAvailable()) {
+      Alert.alert(
+        'Development build required',
+        'App blocking uses a native Android service and is not available in Expo Go. Install a development or production build of AST Time to use it.',
+      );
+      return;
+    }
+    setModal('appPicker');
+    void fetchApps();
+  };
+
+  const selectAppToBlock = (packageName: string, label: string) => {
+    if (data.blockedApps.some((app) => app.packageName === packageName)) {
+      Alert.alert('Already added', 'This app is already in your block list.');
+      return;
+    }
+    const app: BlockedApp = {
+      packageName,
+      label,
+      dailyLimitMinutes: 60,
+      blockDuringFocus: true,
+      scheduleIds: [],
+    };
+    updateData((current) => ({ ...current, blockedApps: [...current.blockedApps, app] }));
+  };
+
   const addBlockedApp = () => {
     if (!newAppPackage.trim() || !newAppLabel.trim()) {
       Alert.alert('Add an app', 'Enter both the package name and display label.');
@@ -512,16 +679,24 @@ export function useChronoFlow() {
       Alert.alert('Check times', 'Use a valid 24-hour format, for example 21:00.');
       return;
     }
+    if (newScheduleStart === newScheduleEnd) {
+      Alert.alert('Check times', 'The start and end time must be different.');
+      return;
+    }
+    if (newScheduleDays.length === 0) {
+      Alert.alert('Select repeat days', 'Choose at least one day for this schedule.');
+      return;
+    }
     const schedule: BlockSchedule = {
       id: `schedule-${Date.now()}`,
       startTime: newScheduleStart,
       endTime: newScheduleEnd,
-      days: newScheduleDays,
+      days: [...newScheduleDays].sort(),
       enabled: true,
     };
     updateData((current) => ({ ...current, schedules: [...current.schedules, schedule] }));
     setNewScheduleDays([1, 2, 3, 4, 5]);
-    setAddScheduleModal(false);
+    setModal(null);
   };
 
   const removeSchedule = (id: string) => {
@@ -537,6 +712,7 @@ export function useChronoFlow() {
 
   const toggleNotifications = (enabled: boolean) => {
     updateData((current) => ({ ...current, notificationsEnabled: enabled }));
+    void syncNotifications(dataRef.current.alarms, enabled);
   };
 
   const setTheme = (theme: 'light' | 'dark' | 'system') => {
@@ -549,18 +725,45 @@ export function useChronoFlow() {
   };
 
   const clearAllData = () => {
-    updateData(() => defaultData());
+    const next = defaultData();
+    setTimerRunning(false);
+    setTimerEndAt(null);
+    setRemaining(next.focus.workMins * 60);
+    setFocusMode('work');
+    clearNativeBlockState();
+    setIsBlocking(false);
+    void cancelTimerNotification();
+    setRinging(null);
+    setModal(null);
+    lastFiredRef.current = '';
+    updateData(() => next);
+    void syncNotifications([], false);
   };
 
-  const exportData = () => {
-    Alert.alert('Export', 'Data export is not implemented yet. Use the storage key "asttime-state-v1" to locate your data.');
+  const exportData = async () => {
+    try {
+      await Share.share({
+        title: 'AST Time data',
+        message: JSON.stringify(dataRef.current, null, 2),
+      });
+    } catch (error) {
+      Alert.alert('Could not export data', String(error));
+    }
   };
 
-  const openPermissions = () => {
-    Alert.alert(
-      'Enable accessibility service',
-      'Go to Settings > Accessibility > AST Time Focus Blocker and turn it on.',
-    );
+  const handleOpenPermissions = () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Not available', 'App blocking is only available on Android.');
+      return;
+    }
+    if (!isNativeBlockingAvailable()) {
+      Alert.alert(
+        'Development build required',
+        'App blocking uses a native Android service and is not available in Expo Go. Install a development or production build of AST Time to use it.',
+      );
+      return;
+    }
+    openAccessibilitySettings();
   };
 
   return {
@@ -603,6 +806,9 @@ export function useChronoFlow() {
     remaining,
     timerRunning,
     isBlocking,
+    accessibilityEnabled,
+    installedApps,
+    loadingApps,
     activeAlarms,
     completedCount,
     progress,
@@ -617,6 +823,7 @@ export function useChronoFlow() {
     selectFocusMode,
     pauseFocusTimer,
     startFocusTimer,
+    startQuickFocus,
     resetFocusTimer,
     openTimerSettings,
     linkFocusTask,
@@ -625,6 +832,8 @@ export function useChronoFlow() {
     dismissAlarm,
     snoozeAlarm,
     verifyMath,
+    openAddAppPicker,
+    selectAppToBlock,
     addBlockedApp,
     removeBlockedApp,
     toggleBlockedApp,
@@ -636,9 +845,9 @@ export function useChronoFlow() {
     setTimeFormat,
     clearAllData,
     exportData,
-    openPermissions,
+    openPermissions: handleOpenPermissions,
     openAddAppModal: () => setAddAppModal(true),
-    openAddScheduleModal: () => setAddScheduleModal(true),
+    openAddScheduleModal: () => setModal('schedule'),
     addAppModal,
     addScheduleModal,
     newAppPackage,

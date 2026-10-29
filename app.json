@@ -18,7 +18,10 @@
     ],
     "ios": {
       "bundleIdentifier": "com.asteway.chronoflow",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,10 +31,21 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.asteway.chronoflow"
+      "package": "com.asteway.chronoflow",
+      "versionCode": 3,
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0217f75e-a897-4345-8a63-8f6441904b7b"
+      }
+    },
+    "owner": "asteway",
+    "updates": {
+      "url": "https://u.expo.dev/0217f75e-a897-4345-8a63-8f6441904b7b"
     }
   }
 }

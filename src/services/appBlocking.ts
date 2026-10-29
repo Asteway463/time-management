@@ -1,9 +1,14 @@
-import { Linking, Platform } from 'react-native';
+import { Linking, NativeModules, Platform } from 'react-native';
+
+const { FocusModule } = NativeModules;
+
+export function isNativeBlockingAvailable(): boolean {
+  return isAndroid() && FocusModule != null;
+}
 
 export interface InstalledApp {
   packageName: string;
   label: string;
-  icon?: string;
 }
 
 export interface BlockSession {
@@ -24,21 +29,42 @@ export function isAndroid(): boolean {
   return Platform.OS === 'android';
 }
 
+export async function isAccessibilityEnabled(): Promise<boolean> {
+  if (!isNativeBlockingAvailable()) return false;
+  try {
+    return await FocusModule.isAccessibilityEnabled();
+  } catch {
+    return false;
+  }
+}
+
+export function openAccessibilitySettings() {
+  if (isNativeBlockingAvailable()) {
+    FocusModule.openAccessibilitySettings();
+  } else {
+    void Linking.openSettings();
+  }
+}
+
+export async function getInstalledApps(): Promise<InstalledApp[]> {
+  if (!isNativeBlockingAvailable()) return [];
+  return await FocusModule.getInstalledApps();
+}
+
+export function setNativeBlockState(packages: string[], reason: string, endAt: number) {
+  if (isNativeBlockingAvailable()) {
+    FocusModule.setBlockState(packages, reason, endAt);
+  }
+}
+
+export function clearNativeBlockState() {
+  if (isNativeBlockingAvailable()) {
+    FocusModule.clearBlockState();
+  }
+}
+
 export function getAccessibilityServiceComponent(): string {
   return 'com.asteway.chronoflow/.BlockAccessibilityService';
-}
-
-export function getAccessibilitySettingsIntent() {
-  return Linking.openSettings();
-}
-
-export function getUsageStatsSettingsIntent() {
-  if (Platform.OS !== 'android') return Promise.resolve();
-  return Linking.openSettings();
-}
-
-export function getPackageIntent(packageName: string) {
-  return Linking.openSettings();
 }
 
 export function buildBlockSession(

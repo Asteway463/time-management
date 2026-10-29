@@ -4,9 +4,8 @@ import type { BlockedApp, BlockSchedule } from './types';
 import type { BlockSession } from './services/appBlocking';
 import {
   buildBlockSession,
-  getAccessibilitySettingsIntent,
-  getAccessibilityServiceComponent,
   isAndroid,
+  openAccessibilitySettings,
 } from './services/appBlocking';
 
 export interface UseAppBlockingReturn {
@@ -58,8 +57,7 @@ export function useAppBlocking(): UseAppBlockingReturn {
       return;
     }
     try {
-      await getAccessibilitySettingsIntent();
-      setAccessibilityEnabled(true);
+      openAccessibilitySettings();
     } catch {
       Alert.alert('Could not open settings', 'Please enable the accessibility service manually.');
     }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
 import { formatTime } from '../constants';
-import { LAYOUT, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { BlockedApp, BlockSchedule, TimeFormat } from '../types';
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
   onToggleSchedule: (id: string, enabled: boolean) => void;
   onOpenPermissions: () => void;
   timeFormat: TimeFormat;
+  accessibilityEnabled: boolean;
 };
 
 export function BlockingScreen({
@@ -29,6 +30,7 @@ export function BlockingScreen({
   onToggleSchedule,
   onOpenPermissions,
   timeFormat,
+  accessibilityEnabled,
 }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
@@ -43,11 +45,18 @@ export function BlockingScreen({
       <Card>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Accessibility service</Text>
+          <View style={[styles.statusBadge, accessibilityEnabled ? styles.statusActive : styles.statusInactive]}>
+            <Text style={styles.statusText}>{accessibilityEnabled ? 'Active' : 'Disabled'}</Text>
+          </View>
         </View>
         <Text style={styles.muted}>
-          Enable the AST Time Focus Blocker to actively prevent access to selected apps during focus sessions.
+          {accessibilityEnabled
+            ? 'The AST Time Focus Blocker is enabled and ready to manage app access.'
+            : 'Enable the AST Time Focus Blocker in accessibility settings to actively prevent access to selected apps.'}
         </Text>
-        <Button title="Grant permission" onPress={onOpenPermissions} variant="secondary" />
+        {!accessibilityEnabled && (
+          <Button title="Grant permission" onPress={onOpenPermissions} variant="secondary" />
+        )}
       </Card>
 
       <Card>
@@ -110,6 +119,10 @@ export function BlockingScreen({
 const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
+  statusBadge: { paddingHorizontal: SPACE.sm, paddingVertical: SPACE.xs / 2, borderRadius: RADII.pill },
+  statusActive: { backgroundColor: COLORS.greenMuted },
+  statusInactive: { backgroundColor: COLORS.redMuted },
+  statusText: { fontSize: TYPE.micro, fontWeight: '700', color: COLORS.white },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700' },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: 20 },
   flex: { flex: 1, minWidth: 0 },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, Card, ScreenHeading } from '../components/Common';
+import { Button, Card, ChoiceRow, ScreenHeading } from '../components/Common';
 import { formatCountdown, formatDuration } from '../constants';
 import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, FocusMode, Tab } from '../types';
@@ -48,6 +48,13 @@ export function FocusScreen({
       />
 
       <Card style={styles.focusCard}>
+        <ChoiceRow<FocusMode>
+          values={MODES.map((item) => item.id)}
+          selected={mode}
+          onSelect={onMode}
+          labels={Object.fromEntries(MODES.map((item) => [item.id, item.label]))}
+          equal
+        />
         <Text style={[styles.eyebrow, { textAlign: 'center' }]}>{modeLabel}</Text>
         <Text style={styles.focusTime}>{formatCountdown(remaining)}</Text>
         <Text style={styles.smallMuted}>
@@ -66,7 +73,7 @@ export function FocusScreen({
 
       <Card>
         <Text style={styles.cardTitle}>Quick actions</Text>
-        <Button title="Quick Focus (25 min)" onPress={onQuickFocus} variant="secondary" />
+        <Button title="Start a quick focus session" onPress={onQuickFocus} variant="secondary" />
       </Card>
     </View>
   );

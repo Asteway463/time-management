@@ -15,7 +15,7 @@ npm run dev
 
 The start scripts select Expo Go and use your local network. Connect your phone and computer to the same Wi-Fi, then open Expo Go and scan the QR code from Expo Go's scanner; scanning with the phone camera may open a web page instead. If Expo Go reports an SDK mismatch, update Expo Go and restart the server to generate a new QR code. For a browser preview, run `npx expo start --web`; web dependencies are already installed.
 
-The install applies a small `expo-notifications` compatibility patch: Expo Go may not include the Android-only `ExpoTopicSubscriptionModule`, which otherwise crashes app startup even when the app only uses local notifications. The patch loads this module optionally; remote topic subscription remains unavailable when the native module is absent. After installing or updating dependencies, restart Metro with `npx expo start --clear`.
+Expo Go may not include the Android-only `ExpoTopicSubscriptionModule`. `expo-notifications` 58.1.7 loads that module optionally, so local alarms work without it; remote topic subscriptions remain unavailable when the native module is absent. After installing or updating dependencies, restart Metro with `npx expo start --clear`.
 
 ## Run with Docker
 
@@ -62,7 +62,7 @@ npx expo export --platform all
 ## Component layout
 
 - `App.tsx` composes the app shell, navigation, screens, and dialogs.
-- `src/screens/` contains the dashboard, alarm manager, planner, and focus timer screens.
+- `src/screens/` contains the home, alarm manager, focus timer, app blocking, statistics, and settings screens.
 - `src/components/Common.tsx` contains reusable cards, buttons, headings, choice controls, and task rows.
 - `src/components/Dialogs.tsx` contains form and ringing-alarm dialogs.
 - `src/theme.ts` defines shared design tokens used by all screens and components.

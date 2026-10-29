@@ -5,14 +5,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiveClock } from './src/components/Common';
 import {
   AlarmFormModal,
+  AppPickerModal,
   RingingAlarmModal,
+  ScheduleFormModal,
   TaskFormModal,
   TimerSettingsModal,
 } from './src/components/Dialogs';
 import { TAB_LABELS } from './src/constants';
+import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BlockingScreen } from './src/screens/BlockingScreen';
 import { FocusScreen } from './src/screens/FocusScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { PlannerScreen } from './src/screens/PlannerScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { COLORS, LIGHT_COLORS, LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, ThemeColorsContext, type ThemeColors } from './src/theme';
@@ -89,7 +93,20 @@ export default function App() {
             onNavigate={flow.setTab}
             onAddTask={() => flow.setModal('task')}
             onToggleTask={flow.toggleTask}
-            onQuickFocus={flow.startFocusTimer}
+            onAddAlarm={() => flow.setModal('alarm')}
+            onQuickFocus={flow.startQuickFocus}
+            timeFormat={flow.data.timeFormat}
+          />
+        )}
+        {flow.tab === 'planner' && (
+          <PlannerScreen
+            tasks={flow.data.tasks}
+            filter={flow.filter}
+            completedCount={flow.completedCount}
+            onFilter={flow.setFilter}
+            onAdd={() => flow.setModal('task')}
+            onToggle={flow.toggleTask}
+            onDelete={flow.deleteTask}
             timeFormat={flow.data.timeFormat}
           />
         )}
@@ -104,14 +121,23 @@ export default function App() {
             onSettings={flow.openTimerSettings}
             onToggleTimer={flow.timerRunning ? flow.pauseFocusTimer : flow.startFocusTimer}
             onReset={flow.resetFocusTimer}
-            onQuickFocus={flow.startFocusTimer}
+            onQuickFocus={flow.startQuickFocus}
+          />
+        )}
+        {flow.tab === 'alarms' && (
+          <AlarmsScreen
+            alarms={flow.data.alarms}
+            onAddAlarm={() => flow.setModal('alarm')}
+            onToggleAlarm={flow.changeAlarmActive}
+            onDeleteAlarm={flow.deleteAlarm}
+            timeFormat={flow.data.timeFormat}
           />
         )}
         {flow.tab === 'blocking' && (
           <BlockingScreen
             blockedApps={flow.data.blockedApps}
             schedules={flow.data.schedules}
-            onAddApp={flow.openAddAppModal}
+            onAddApp={flow.openAddAppPicker}
             onRemoveApp={flow.removeBlockedApp}
             onToggleApp={flow.toggleBlockedApp}
             onAddSchedule={flow.openAddScheduleModal}
@@ -119,6 +145,7 @@ export default function App() {
             onToggleSchedule={flow.toggleSchedule}
             onOpenPermissions={flow.openPermissions}
             timeFormat={flow.data.timeFormat}
+            accessibilityEnabled={flow.accessibilityEnabled}
           />
         )}
         {flow.tab === 'stats' && (
@@ -181,6 +208,24 @@ export default function App() {
         onSave={flow.saveTimerSettings}
         settings={flow.settings}
         setSettings={flow.setSettings}
+      />
+      <ScheduleFormModal
+        visible={flow.modal === 'schedule'}
+        onClose={closeForm}
+        onSave={flow.addSchedule}
+        startTime={flow.newScheduleStart}
+        setStartTime={flow.setNewScheduleStart}
+        endTime={flow.newScheduleEnd}
+        setEndTime={flow.setNewScheduleEnd}
+        days={flow.newScheduleDays}
+        setDays={flow.setNewScheduleDays}
+      />
+      <AppPickerModal
+        visible={flow.modal === 'appPicker'}
+        onClose={closeForm}
+        onSelect={flow.selectAppToBlock}
+        apps={flow.installedApps}
+        loading={flow.loadingApps}
       />
       <RingingAlarmModal
         alarm={flow.ringing}
