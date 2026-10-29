@@ -1,9 +1,7 @@
-import { Linking, NativeModules, Platform } from 'react-native';
-
-const { FocusModule } = NativeModules;
+import { Platform } from 'react-native';
 
 export function isNativeBlockingAvailable(): boolean {
-  return isAndroid() && FocusModule != null;
+  return false;
 }
 
 export interface InstalledApp {
@@ -30,41 +28,27 @@ export function isAndroid(): boolean {
 }
 
 export async function isAccessibilityEnabled(): Promise<boolean> {
-  if (!isNativeBlockingAvailable()) return false;
-  try {
-    return await FocusModule.isAccessibilityEnabled();
-  } catch {
-    return false;
-  }
+  return false;
 }
 
-export function openAccessibilitySettings() {
-  if (isNativeBlockingAvailable()) {
-    FocusModule.openAccessibilitySettings();
-  } else {
-    void Linking.openSettings();
-  }
-}
+export function openAccessibilitySettings() {}
 
 export async function getInstalledApps(): Promise<InstalledApp[]> {
-  if (!isNativeBlockingAvailable()) return [];
-  return await FocusModule.getInstalledApps();
+  return [];
 }
 
 export function setNativeBlockState(packages: string[], reason: string, endAt: number) {
-  if (isNativeBlockingAvailable()) {
-    FocusModule.setBlockState(packages, reason, endAt);
-  }
+  void packages;
+  void reason;
+  void endAt;
 }
 
 export function clearNativeBlockState() {
-  if (isNativeBlockingAvailable()) {
-    FocusModule.clearBlockState();
-  }
+  // Expo Go does not expose an API for blocking other installed apps.
 }
 
 export function getAccessibilityServiceComponent(): string {
-  return 'com.asteway.chronoflow/.BlockAccessibilityService';
+  return '';
 }
 
 export function buildBlockSession(

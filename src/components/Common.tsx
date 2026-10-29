@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -7,6 +8,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { AppIcon } from './AppIcon';
 import { formatTime } from '../constants';
 import type { Alarm, Task, TimeFormat } from '../types';
 import { LINE_HEIGHT, RADII, SHADOWS, SPACE, TRACKING, TYPE, useThemedStyles, type ThemeColors } from '../theme';
@@ -47,6 +49,25 @@ export function Metric({ label, value, color }: { label: string; value: string; 
   );
 }
 
+export function ProgressBar({ progress, color, height = 9 }: { progress: number; color: string; height?: number }) {
+  const styles = useStyles();
+  const width = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.timing(width, {
+      toValue: Math.max(0, Math.min(100, progress)),
+      duration: 650,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, width]);
+  return (
+    <View style={[styles.progressTrack, { height }]}>
+      <Animated.View style={[styles.progressFill, { backgroundColor: color, width: width.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]} />
+    </View>
+  );
+}
+
 export function LiveClock({ timeFormat = '24h' }: { timeFormat?: TimeFormat }) {
   const styles = useStyles();
   const [now, setNow] = useState(new Date());
@@ -71,11 +92,13 @@ export function Button({
   onPress,
   variant = 'primary',
   small = false,
+  icon,
 }: {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   small?: boolean;
+  icon?: import('./AppIcon').AppIconName;
 }) {
   const styles = useStyles();
   return (
@@ -90,6 +113,7 @@ export function Button({
         pressed && styles.pressed,
       ]}
     >
+      {icon && <AppIcon name={icon} size={16} color={variant === 'secondary' ? styles.buttonTextSecondary.color as string : '#FFFFFF'} />}
       <Text style={[styles.buttonText, variant === 'secondary' && styles.buttonTextSecondary]}>{title}</Text>
     </Pressable>
   );
@@ -132,6 +156,11 @@ export function TaskRow({
   const priorityTextStyle = task.priority === 'High'
     ? styles.priorityTextHigh
     : task.priority === 'Medium' ? styles.priorityTextMedium : styles.priorityTextLow;
+  const checkScale = useRef(new Animated.Value(task.completed ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(checkScale, { toValue: task.completed ? 1 : 0, useNativeDriver: true, speed: 24, bounciness: 7 }).start();
+  }, [checkScale, task.completed]);
 
   return (
     <View style={styles.taskRow}>
@@ -142,7 +171,11 @@ export function TaskRow({
         onPress={onToggle}
         style={({ pressed }) => [styles.checkbox, task.completed && styles.checkboxDone, pressed && styles.pressed]}
       >
-        <Text style={styles.checkmark}>{task.completed ? '✓' : ''}</Text>
+        {task.completed && (
+          <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+            <AppIcon name="check" size={15} color={styles.checkmark.color as string} strokeWidth={2.6} />
+          </Animated.View>
+        )}
       </Pressable>
       <View style={styles.taskCopy}>
         <Text style={[styles.taskTitle, task.completed && styles.taskTitleDone]} numberOfLines={1}>{task.title}</Text>
@@ -159,7 +192,7 @@ export function TaskRow({
           onPress={onDelete}
           style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
         >
-          <Text style={styles.deleteText}>×</Text>
+          <AppIcon name="close" size={16} color={styles.deleteText.color as string} />
         </Pressable>
       )}
     </View>
@@ -177,7 +210,7 @@ export function ModalHeading({ title, onClose }: { title: string; onClose: () =>
     <View style={styles.rowBetween}>
       <Text style={styles.modalTitle}>{title}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.closeButton}>
-        <Text style={styles.close}>×</Text>
+        <AppIcon name="close" size={18} color={styles.close.color as string} />
       </Pressable>
     </View>
   );
@@ -231,6 +264,8 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     gap: SPACE.md,
     ...SHADOWS.card,
   },
+  progressTrack: { width: '100%', height: 9, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceRaised, overflow: 'hidden', marginTop: SPACE.sm },
+  progressFill: { height: '100%', borderRadius: RADII.pill },
   screenHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
   screenHeadingCopy: { flex: 1, gap: SPACE.xs },
   screenTitle: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800' },
@@ -258,6 +293,7 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    gap: SPACE.xs,
   },
   buttonSecondary: { backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border },
   buttonDanger: { backgroundColor: COLORS.red },

@@ -616,8 +616,8 @@ export function useChronoFlow() {
   const openAddAppPicker = () => {
     if (!isNativeBlockingAvailable()) {
       Alert.alert(
-        'Development build required',
-        'App blocking uses a native Android service and is not available in Expo Go. Install a development or production build of AST Time to use it.',
+        'Unavailable in Expo',
+        'Expo managed apps cannot inspect installed apps or block their access. Your focus timer and scheduled reminders work without this feature.',
       );
       return;
     }
@@ -758,8 +758,8 @@ export function useChronoFlow() {
     }
     if (!isNativeBlockingAvailable()) {
       Alert.alert(
-        'Development build required',
-        'App blocking uses a native Android service and is not available in Expo Go. Install a development or production build of AST Time to use it.',
+        'Unavailable in Expo',
+        'Expo managed apps cannot inspect installed apps or block their access.',
       );
       return;
     }

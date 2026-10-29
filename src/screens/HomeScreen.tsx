@@ -1,8 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button, Card, EmptyCard, Metric, ScreenHeading, TaskRow } from '../components/Common';
+import { Button, Card, EmptyCard, Metric, ProgressBar, ScreenHeading, TaskRow } from '../components/Common';
+import { AppIcon } from '../components/AppIcon';
 import { formatDuration } from '../constants';
-import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import { LAYOUT, LINE_HEIGHT, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, Tab, TimeFormat } from '../types';
 
 type Props = {
@@ -41,12 +42,8 @@ export function HomeScreen({
         <Text style={styles.eyebrow}>TODAY'S FOCUS</Text>
         <Text style={styles.focusTime}>{formatDuration(data.focus.totalFocusMinsToday)}</Text>
         <Text style={styles.muted}>of {formatDuration(data.focus.dailyGoal)} goal</Text>
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={{ min: 0, max: 100, now: goalProgress }}
-          style={styles.progressTrack}
-        >
-          <View style={[styles.progressFill, { width: `${goalProgress}%` }]} />
+        <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: goalProgress }} style={{ width: '100%' }}>
+          <ProgressBar progress={goalProgress} color={colors.green} />
         </View>
         <Button title="Quick Focus Session" onPress={onQuickFocus} />
       </Card>
@@ -61,7 +58,7 @@ export function HomeScreen({
       <Card>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Today's tasks</Text>
-          <Button title="+ Add" onPress={onAddTask} small variant="secondary" />
+          <Button title="Add" icon="plus" onPress={onAddTask} small variant="secondary" />
         </View>
         {hasTasks ? (
           data.tasks.slice(0, 3).map((task) => (
@@ -80,7 +77,7 @@ export function HomeScreen({
         <Button title="Set an alarm" onPress={onAddAlarm} variant="secondary" />
       </Card>
 
-      <Text style={styles.streak}>🔥 {data.streak} day streak</Text>
+      <View style={styles.streak}><AppIcon name="spark" size={17} color={colors.amber} /><Text style={styles.streakText}>{data.streak} day streak</Text></View>
     </View>
   );
 }
@@ -91,11 +88,10 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label },
   focusTime: { color: COLORS.text, fontSize: TYPE.display, fontWeight: '800', fontVariant: ['tabular-nums'] },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body },
-  progressTrack: { height: 9, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceRaised, overflow: 'hidden', marginTop: SPACE.sm },
-  progressFill: { height: '100%', backgroundColor: COLORS.green, borderRadius: RADII.pill },
   quickButton: { marginTop: SPACE.md, width: '100%' },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700' },
-  streak: { textAlign: 'center', color: COLORS.amber, fontWeight: '700', padding: SPACE.sm },
+  streak: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs, padding: SPACE.sm },
+  streakText: { color: COLORS.amber, fontWeight: '700' },
 });

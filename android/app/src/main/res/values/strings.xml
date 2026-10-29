@@ -1,5 +1,0 @@
-<resources>
-  <string name="app_name">AST Time</string>
-  <string name="block_service_label">AST Time Focus Blocker</string>
-  <string name="expo_runtime_version">1.0.0</string>
-</resources>

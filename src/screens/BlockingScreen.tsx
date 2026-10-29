@@ -14,7 +14,6 @@ type Props = {
   onAddSchedule: () => void;
   onRemoveSchedule: (id: string) => void;
   onToggleSchedule: (id: string, enabled: boolean) => void;
-  onOpenPermissions: () => void;
   timeFormat: TimeFormat;
   accessibilityEnabled: boolean;
 };
@@ -28,7 +27,6 @@ export function BlockingScreen({
   onAddSchedule,
   onRemoveSchedule,
   onToggleSchedule,
-  onOpenPermissions,
   timeFormat,
   accessibilityEnabled,
 }: Props) {
@@ -38,25 +36,20 @@ export function BlockingScreen({
     <View style={styles.content}>
       <ScreenHeading
         title="App blocking"
-        subtitle="Block distracting apps during focus sessions."
+        subtitle="App blocking requires a custom native Android service, which is not included in this Expo app."
         action={<Button title="Add app" onPress={onAddApp} small />}
       />
 
       <Card>
         <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>Accessibility service</Text>
+          <Text style={styles.cardTitle}>Expo managed app</Text>
           <View style={[styles.statusBadge, accessibilityEnabled ? styles.statusActive : styles.statusInactive]}>
-            <Text style={styles.statusText}>{accessibilityEnabled ? 'Active' : 'Disabled'}</Text>
+            <Text style={styles.statusText}>Unavailable</Text>
           </View>
         </View>
         <Text style={styles.muted}>
-          {accessibilityEnabled
-            ? 'The AST Time Focus Blocker is enabled and ready to manage app access.'
-            : 'Enable the AST Time Focus Blocker in accessibility settings to actively prevent access to selected apps.'}
+          {'Expo does not allow apps to inspect or block other installed apps. Your existing app list and schedules are kept as saved data.'}
         </Text>
-        {!accessibilityEnabled && (
-          <Button title="Grant permission" onPress={onOpenPermissions} variant="secondary" />
-        )}
       </Card>
 
       <Card>
@@ -88,7 +81,7 @@ export function BlockingScreen({
       <Card>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Blocking schedules</Text>
-          <Button title="+ Add" onPress={onAddSchedule} small variant="secondary" />
+          <Button title="Add" icon="plus" onPress={onAddSchedule} small variant="secondary" />
         </View>
         {schedules.length === 0 && (
           <Text style={styles.muted}>No schedules set. Add one to auto-block apps at specific times.</Text>

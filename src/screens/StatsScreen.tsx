@@ -1,8 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, Metric, ScreenHeading } from '../components/Common';
+import { Card, Metric, ProgressBar, ScreenHeading } from '../components/Common';
+import { AppIcon } from '../components/AppIcon';
 import { formatDuration } from '../constants';
-import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import { LAYOUT, LINE_HEIGHT, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, FocusSession } from '../types';
 
 type Props = {
@@ -34,9 +35,7 @@ export function StatsScreen({ data, sessions }: Props) {
         <Text style={styles.eyebrow}>TODAY</Text>
         <Text style={styles.bigNumber}>{formatDuration(data.focus.totalFocusMinsToday)}</Text>
         <Text style={styles.muted}>Goal: {formatDuration(data.focus.dailyGoal)} · {goalProgress}%</Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${goalProgress}%` }]} />
-        </View>
+        <ProgressBar progress={goalProgress} color={colors.green} />
       </Card>
 
       <View style={styles.metricsGrid}>
@@ -48,7 +47,7 @@ export function StatsScreen({ data, sessions }: Props) {
 
       <Card>
         <Text style={styles.cardTitle}>Streak</Text>
-        <Text style={styles.streakNumber}>🔥 {data.streak} days</Text>
+        <View style={styles.streakRow}><AppIcon name="spark" size={20} color={colors.amber} /><Text style={styles.streakNumber}>{data.streak} days</Text></View>
         <Text style={styles.muted}>Keep your focus streak going!</Text>
       </Card>
 
@@ -61,7 +60,7 @@ export function StatsScreen({ data, sessions }: Props) {
                 {new Date(session.startedAt).toLocaleDateString()}
               </Text>
               <Text style={styles.sessionDuration}>
-                {formatDuration(session.duration)} · {session.completed ? '✓' : 'interrupted'}
+                {formatDuration(session.duration)} · {session.completed ? 'Completed' : 'Interrupted'}
               </Text>
             </View>
           ))}
@@ -76,10 +75,9 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label },
   bigNumber: { color: COLORS.text, fontSize: TYPE.display, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: SPACE.xs },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body },
-  progressTrack: { height: 9, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceRaised, overflow: 'hidden', marginTop: SPACE.sm },
-  progressFill: { height: '100%', backgroundColor: COLORS.green, borderRadius: RADII.pill },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700', marginBottom: SPACE.sm },
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   streakNumber: { color: COLORS.amber, fontSize: TYPE.heading, fontWeight: '800' },
   sessionRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACE.xs },
   sessionDate: { color: COLORS.muted, fontSize: TYPE.caption },

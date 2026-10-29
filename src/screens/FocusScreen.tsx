@@ -1,6 +1,7 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, ChoiceRow, ScreenHeading } from '../components/Common';
+import { AppIcon } from '../components/AppIcon';
 import { formatCountdown, formatDuration } from '../constants';
 import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, FocusMode, Tab } from '../types';
@@ -38,6 +39,21 @@ export function FocusScreen({
 }: Props) {
   const styles = useThemedStyles(createStyles);
   const modeLabel = mode === 'work' ? 'DEEP FOCUS' : mode === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK';
+  const timerPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!timerRunning) {
+      timerPulse.stopAnimation();
+      timerPulse.setValue(1);
+      return;
+    }
+    const pulse = Animated.loop(Animated.sequence([
+      Animated.timing(timerPulse, { toValue: 1.025, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(timerPulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    pulse.start();
+    return () => pulse.stop();
+  }, [timerPulse, timerRunning]);
 
   return (
     <View style={styles.content}>
@@ -56,7 +72,7 @@ export function FocusScreen({
           equal
         />
         <Text style={[styles.eyebrow, { textAlign: 'center' }]}>{modeLabel}</Text>
-        <Text style={styles.focusTime}>{formatCountdown(remaining)}</Text>
+        <Animated.Text style={[styles.focusTime, { transform: [{ scale: timerPulse }] }]}>{formatCountdown(remaining)}</Animated.Text>
         <Text style={styles.smallMuted}>
           Focus completed today: {Math.floor(data.focus.totalFocusMinsToday)} min
         </Text>
@@ -66,7 +82,7 @@ export function FocusScreen({
         </View>
         {isBlocking && (
           <View style={styles.blockingBadge}>
-            <Text style={styles.blockingText}>🚫 Apps blocked during session</Text>
+            <View style={styles.blockingLabel}><AppIcon name="blocking" size={15} color={styles.blockingText.color as string} /><Text style={styles.blockingText}>Apps blocked during session</Text></View>
           </View>
         )}
       </Card>
@@ -94,5 +110,6 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     borderRadius: RADII.pill,
     backgroundColor: COLORS.redMuted,
   },
+  blockingLabel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs },
   blockingText: { color: COLORS.red, fontSize: TYPE.caption, fontWeight: '700', textAlign: 'center' },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AlarmSummary, Button, Card, Metric, TaskRow } from '../components/Common';
+import { AlarmSummary, Button, Card, Metric, ProgressBar, TaskRow } from '../components/Common';
+import { AppIcon } from '../components/AppIcon';
 import { formatDuration } from '../constants';
 import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { Alarm, AppData, Tab, TimeFormat } from '../types';
@@ -34,7 +35,7 @@ export function DashboardScreen({
     <View style={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>YOUR DAILY OVERVIEW</Text>
-        <Text style={styles.heroTitle}>Welcome back 👋</Text>
+        <Text style={styles.heroTitle}>Welcome back</Text>
         <Text style={styles.muted}>A little structure makes room for great work.</Text>
         <View style={styles.metrics}>
           <Metric label="Done today" value={`${completedCount}/${data.tasks.length}`} color={colors.green} />
@@ -48,12 +49,8 @@ export function DashboardScreen({
           <Text style={styles.cardTitle}>Today’s schedule progress</Text>
           <Text style={styles.accentText}>{progress}%</Text>
         </View>
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={{ min: 0, max: 100, now: progress }}
-          style={styles.progressTrack}
-        >
-          <View style={[styles.progressFill, { width: `${progress}%` }]} />
+        <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: progress }}>
+          <ProgressBar progress={progress} color={colors.green} />
         </View>
       </Card>
       <Card>
@@ -63,7 +60,7 @@ export function DashboardScreen({
         </View>
         {activeAlarms.slice(0, 3).map((alarm) => <AlarmSummary key={alarm.id} alarm={alarm} timeFormat={timeFormat} />)}
         {activeAlarms.length === 0 && <Text style={styles.emptyText}>No alarms set yet</Text>}
-        <Button title="+ Set an alarm" onPress={onAddAlarm} variant="secondary" />
+        <Button title="Set an alarm" icon="plus" onPress={onAddAlarm} variant="secondary" />
       </Card>
       <Card>
         <View style={styles.rowBetween}>
@@ -74,9 +71,9 @@ export function DashboardScreen({
           <TaskRow key={task.id} task={task} onToggle={() => onToggleTask(task.id)} timeFormat={timeFormat} />
         ))}
         {data.tasks.length === 0 && <Text style={styles.emptyText}>Your schedule is clear. Add a task to get started..</Text>}
-        <Button title="+ Schedule a task" onPress={onAddTask} variant="secondary" />
+        <Button title="Schedule a task" icon="plus" onPress={onAddTask} variant="secondary" />
       </Card>
-      <Text style={styles.streak}> streak 🔥  {data.streak} day of streak </Text>
+      <View style={styles.streak}><AppIcon name="spark" size={17} color={colors.amber} /><Text style={styles.streakText}>{data.streak} day streak</Text></View>
     </View>
   );
 }
@@ -98,9 +95,8 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700' },
   accentText: { color: COLORS.primarySoft, fontWeight: '800', fontSize: TYPE.body },
-  progressTrack: { height: 9, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceRaised, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: COLORS.green, borderRadius: RADII.pill },
   link: { color: COLORS.primarySoft, fontWeight: '700', fontSize: TYPE.small, paddingVertical: SPACE.sm, paddingLeft: SPACE.sm },
   emptyText: { color: COLORS.muted, textAlign: 'center', paddingVertical: SPACE.md, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.relaxed },
-  streak: { textAlign: 'center', color: COLORS.amber, fontWeight: '700', padding: SPACE.sm },
+  streak: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs, padding: SPACE.sm },
+  streakText: { color: COLORS.amber, fontWeight: '700' },
 });

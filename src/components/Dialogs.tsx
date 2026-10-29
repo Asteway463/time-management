@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from './AppIcon';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -236,7 +237,7 @@ export function RingingAlarmModal({
       <View style={styles.ringBackdrop}>
         <ScrollView contentContainerStyle={styles.ringScrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.ringCard}>
-            <Text style={styles.ringIcon}>◉</Text>
+            <View style={styles.ringIcon}><AppIcon name="alarm" size={34} color={colors.red} strokeWidth={1.7} /></View>
             <Text style={styles.eyebrow}>{alarm?.category.toUpperCase()} ALARM</Text>
             <Text style={styles.ringTitle}>{alarm?.label}</Text>
             <Text style={styles.ringTime}>{alarm ? formatTime(alarm.time, timeFormat) : ''}</Text>
@@ -316,9 +317,7 @@ export function AppPickerModal({
                     onClose();
                   }}
                 >
-                  <View style={styles.appIconPlaceholder}>
-                    <Text style={styles.appIconText}>{app.label.charAt(0).toUpperCase()}</Text>
-                  </View>
+                  <View style={styles.appIconPlaceholder}><AppIcon name="app" size={21} color={colors.primaryStrong} /></View>
                   <View style={styles.flex}>
                     <Text style={styles.appLabel}>{app.label}</Text>
                     <Text style={styles.appMeta}>{app.packageName}</Text>
@@ -378,14 +377,13 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   ringBackdrop: { flex: 1, backgroundColor: COLORS.redMuted, justifyContent: 'center', alignItems: 'center', padding: SPACE.lg },
   ringScrollContent: { flexGrow: 1, justifyContent: 'center', width: '100%', alignItems: 'center' },
   ringCard: { width: '100%', maxWidth: 420, backgroundColor: COLORS.surface, borderColor: COLORS.red, borderWidth: 1, borderRadius: RADII.xxl, padding: SPACE.xl, alignItems: 'stretch', gap: SPACE.md },
-  ringIcon: { color: COLORS.red, fontSize: TYPE.iconLarge, textAlign: 'center' },
+  ringIcon: { alignItems: 'center', justifyContent: 'center' },
   eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label, textAlign: 'center' },
   ringTitle: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800', textAlign: 'center' },
   ringTime: { color: COLORS.red, fontSize: TYPE.timer, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body, textAlign: 'center' },
   appPickerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingVertical: SPACE.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   appIconPlaceholder: { width: 40, height: 40, borderRadius: RADII.sm, backgroundColor: COLORS.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
-  appIconText: { color: COLORS.primaryStrong, fontWeight: '800', fontSize: TYPE.bodyLarge },
   appLabel: { color: COLORS.text, fontSize: TYPE.body, fontWeight: '600' },
   appMeta: { color: COLORS.muted, fontSize: TYPE.caption },
   mathQuestion: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800', textAlign: 'center' },

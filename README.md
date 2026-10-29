@@ -1,6 +1,6 @@
 # ChronoFlow
 
-ChronoFlow is a React Native time-management app built with Expo. It includes a daily dashboard, task planner, focus timer, and local alarm reminders.
+ChronoFlow is an Expo managed time-management app. It includes a daily dashboard, task planner, focus timer, and local alarm reminders.
 
 The app targets Expo SDK 58, React Native 0.88.0, and React 19.3.0. `src/theme.ts` is the shared source for colors, spacing, typography, radii, layout sizes, and elevation.
 
@@ -37,18 +37,9 @@ Tasks, alarms, and timer settings are stored on the device. Alarm notifications 
 
 Settings include dark, light, and automatic appearance (which follows the device), plus 12-hour AM/PM or 24-hour time display. Time entry fields accept 24-hour values; display preferences are saved on the device.
 
-## Android notifications
+## Expo limitations
 
-Android requires an alarm notification channel to exist before reminders are scheduled. The channel now supplies explicit audio attributes when enabling its default sound; omitting them caused the Android null-pointer error in `setNotificationChannelAsync`. The channel ID is `chronoflow-alarms-v2` so Android does not reuse an older channel with immutable settings. If notification permission is denied, alarms remain saved but Android will not deliver them.
-
-Changes to the Expo notification plugin configuration require a native rebuild; restarting Metro or refreshing Expo Go does not apply native configuration. For device testing, generate/update the native project and install a development build:
-
-```sh
-npx expo prebuild --platform android
-npx expo run:android
-```
-
-This requires a JDK and Android SDK/Platform Tools. An Expo Go client must also match the project SDK. Verify permission prompts, channel sound/settings, and scheduled delivery on a physical Android device before release.
+App blocking is not available in this Expo managed app because Expo Go does not provide APIs to inspect or block other installed apps. The existing saved app lists and schedules are retained for data compatibility. Tasks, alarms, and focus sessions continue to work with Expo modules.
 
 ## Verify the project
 
