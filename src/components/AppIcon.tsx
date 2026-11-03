@@ -11,7 +11,7 @@ type Props = { name: AppIconName; size?: number; color?: string; strokeWidth?: n
 export function AppIcon({ name, size = 20, color = '#FFFFFF', strokeWidth = 1.8 }: Props) {
   const common = { stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       {name === 'home' && <Path {...common} d="m3.5 10 8.5-7 8.5 7v10a1 1 0 0 1-1 1h-5.3v-6.2h-5.4V21H4.5a1 1 0 0 1-1-1z" />}
       {name === 'planner' && <><Rect {...common} x="3.5" y="5" width="17" height="16" rx="2" /><Line {...common} x1="7.5" y1="3" x2="7.5" y2="7" /><Line {...common} x1="16.5" y1="3" x2="16.5" y2="7" /><Line {...common} x1="3.5" y1="10" x2="20.5" y2="10" /><Path {...common} d="m8 15 2 2 5-5" /></>}
       {name === 'focus' && <><Circle {...common} cx="12" cy="12" r="9" /><Circle {...common} cx="12" cy="12" r="5" /><Circle cx="12" cy="12" r="1.2" fill={color} /></>}
