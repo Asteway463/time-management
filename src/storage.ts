@@ -1,6 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { defaultData, nextTime, STORAGE_KEY, todayKey, validTime } from './constants';
-import type { Alarm, AppData, Category, Priority, Task } from './types';
+import type {
+  Alarm,
+  AppData,
+  BlockSchedule,
+  BlockedApp,
+  Category,
+  FocusMode,
+  FocusSession,
+  Priority,
+  Task,
+} from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -10,6 +20,9 @@ const isCategory = (value: unknown): value is Category =>
 
 const isPriority = (value: unknown): value is Priority =>
   value === 'High' || value === 'Medium' || value === 'Low';
+
+const isFocusMode = (value: unknown): value is FocusMode =>
+  value === 'work' || value === 'shortBreak' || value === 'longBreak';
 
 function parseAlarm(value: unknown, now: number): Alarm | null {
   if (!isRecord(value)
@@ -76,6 +89,86 @@ function parseTask(value: unknown): Task | null {
   };
 }
 
+function parseBlockedApp(value: unknown): BlockedApp | null {
+  if (!isRecord(value)
+    || typeof value.packageName !== 'string'
+    || value.packageName.length === 0
+    || typeof value.label !== 'string'
+    || typeof value.dailyLimitMinutes !== 'number'
+    || !Number.isInteger(value.dailyLimitMinutes)
+    || value.dailyLimitMinutes < 0
+    || typeof value.blockDuringFocus !== 'boolean') {
+    return null;
+  }
+
+  const scheduleIds = Array.isArray(value.scheduleIds)
+    ? value.scheduleIds.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  return {
+    packageName: value.packageName,
+    label: value.label,
+    dailyLimitMinutes: value.dailyLimitMinutes,
+    blockDuringFocus: value.blockDuringFocus,
+    scheduleIds,
+  };
+}
+
+function parseSchedule(value: unknown): BlockSchedule | null {
+  if (!isRecord(value)
+    || typeof value.id !== 'string'
+    || typeof value.startTime !== 'string'
+    || typeof value.endTime !== 'string'
+    || !validTime(value.startTime)
+    || !validTime(value.endTime)
+    || typeof value.enabled !== 'boolean') {
+    return null;
+  }
+
+  const days = Array.isArray(value.days)
+    ? [...new Set(value.days.filter(
+      (day): day is number => Number.isInteger(day) && day >= 0 && day <= 6,
+    ))].sort()
+    : [];
+
+  return {
+    id: value.id,
+    startTime: value.startTime,
+    endTime: value.endTime,
+    days,
+    enabled: value.enabled,
+  };
+}
+
+function parseFocusSession(value: unknown): FocusSession | null {
+  if (!isRecord(value)
+    || typeof value.id !== 'string'
+    || typeof value.startedAt !== 'number'
+    || !Number.isFinite(value.startedAt)
+    || (value.endedAt !== null && (typeof value.endedAt !== 'number' || !Number.isFinite(value.endedAt)))
+    || typeof value.duration !== 'number'
+    || !Number.isFinite(value.duration)
+    || value.duration < 0
+    || !isFocusMode(value.mode)
+    || typeof value.completed !== 'boolean') {
+    return null;
+  }
+
+  const blockedApps = Array.isArray(value.blockedApps)
+    ? value.blockedApps.filter((packageName): packageName is string => typeof packageName === 'string')
+    : [];
+
+  return {
+    id: value.id,
+    startedAt: value.startedAt,
+    endedAt: value.endedAt,
+    duration: value.duration,
+    mode: value.mode,
+    blockedApps,
+    completed: value.completed,
+  };
+}
+
 function parseMinutes(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 120
     ? value
@@ -95,6 +188,15 @@ export function parseAppData(value: unknown): AppData {
     ? value.alarms.map((alarm) => parseAlarm(alarm, Date.now()))
       .filter((alarm): alarm is Alarm => alarm !== null)
     : defaults.alarms;
+  const blockedApps = Array.isArray(value.blockedApps)
+    ? value.blockedApps.map(parseBlockedApp).filter((app): app is BlockedApp => app !== null)
+    : defaults.blockedApps;
+  const schedules = Array.isArray(value.schedules)
+    ? value.schedules.map(parseSchedule).filter((schedule): schedule is BlockSchedule => schedule !== null)
+    : defaults.schedules;
+  const focusSessions = Array.isArray(value.focusSessions)
+    ? value.focusSessions.map(parseFocusSession).filter((session): session is FocusSession => session !== null)
+    : defaults.focusSessions;
 
   const focus = isRecord(value.focus) ? value.focus : {};
   const linkedTaskId = typeof focus.linkedTaskId === 'string' ? focus.linkedTaskId : '';
@@ -107,9 +209,9 @@ export function parseAppData(value: unknown): AppData {
   return {
     alarms,
     tasks,
-    blockedApps: defaults.blockedApps,
-    schedules: defaults.schedules,
-    focusSessions: defaults.focusSessions,
+    blockedApps,
+    schedules,
+    focusSessions,
     focus: {
       workMins: parseMinutes(focus.workMins, defaults.focus.workMins),
       shortMins: parseMinutes(focus.shortMins, defaults.focus.shortMins),

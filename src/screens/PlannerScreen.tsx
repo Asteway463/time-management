@@ -24,7 +24,7 @@ export function PlannerScreen({ tasks, filter, completedCount, onFilter, onAdd, 
       <ScreenHeading
         title="Planner & tasks"
         subtitle="Block time for the things you want to finish."
-        action={<Button title="+ Add task" onPress={onAdd} small />}
+        action={<Button title="Add task" icon="plus" onPress={onAdd} small />}
       />
       <Card>
         <ChoiceRow values={['All', ...CATEGORIES]} selected={filter} onSelect={onFilter} />

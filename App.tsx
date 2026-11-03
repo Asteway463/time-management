@@ -1,18 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from './src/components/AppIcon';
 import { LiveClock } from './src/components/Common';
 import {
   AlarmFormModal,
+  AppPickerModal,
   RingingAlarmModal,
+  ScheduleFormModal,
   TaskFormModal,
   TimerSettingsModal,
 } from './src/components/Dialogs';
 import { TAB_LABELS } from './src/constants';
+import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BlockingScreen } from './src/screens/BlockingScreen';
 import { FocusScreen } from './src/screens/FocusScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { PlannerScreen } from './src/screens/PlannerScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { COLORS, LIGHT_COLORS, LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, ThemeColorsContext, type ThemeColors } from './src/theme';
@@ -27,6 +32,17 @@ export default function App() {
   const styles = createStyles(colors);
   const closeForm = () => flow.setModal(null);
   const pendingTasks = flow.data.tasks.filter((task) => !task.completed).length;
+  const activityProgress = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    activityProgress.setValue(0);
+    Animated.timing(activityProgress, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [flow.tab, activityProgress]);
 
   if (!flow.loaded) {
     return (
@@ -44,10 +60,10 @@ export default function App() {
       <StatusBar style={colors === LIGHT_COLORS ? 'dark' : 'light'} />
       <View style={styles.header}>
         <View style={styles.brandRow}>
-          <View style={styles.brandIcon}><Text style={styles.brandIconText}>◷</Text></View>
+          <View style={styles.brandIcon}><AppIcon name="clock" size={26} color={colors.white} strokeWidth={1.9} /></View>
           <View>
             <Text style={styles.brandTitle}>AST Time</Text>
-            <Text style={styles.headerSubtitle}>Block distractions. Focus on what matters</Text>
+            <Text style={styles.headerSubtitle}>Make time for what matters</Text>
           </View>
         </View>
         <View style={styles.clockBox}><LiveClock timeFormat={flow.data.timeFormat} /></View>
@@ -68,6 +84,7 @@ export default function App() {
                 onPress={() => flow.setTab(item.id)}
                 style={({ pressed }) => [styles.tab, flow.tab === item.id && styles.tabActive, pressed && styles.tabPressed]}
               >
+                <AppIcon name={item.icon} size={18} color={flow.tab === item.id ? colors.white : colors.muted} />
                 <Text style={[styles.tabText, flow.tab === item.id && styles.tabTextActive]}>{item.label}</Text>
                 {count > 0 && (
                   <View style={[styles.tabBadge, flow.tab === item.id && styles.tabBadgeActive]}>
@@ -81,6 +98,10 @@ export default function App() {
       </View>
 
       <ScrollView style={styles.pageScroll} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+        <Animated.View style={[styles.activityContent, {
+          opacity: activityProgress,
+          transform: [{ translateY: activityProgress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+        }]}>
         {flow.tab === 'home' && (
           <HomeScreen
             data={flow.data}
@@ -89,7 +110,20 @@ export default function App() {
             onNavigate={flow.setTab}
             onAddTask={() => flow.setModal('task')}
             onToggleTask={flow.toggleTask}
-            onQuickFocus={flow.startFocusTimer}
+            onAddAlarm={() => flow.setModal('alarm')}
+            onQuickFocus={flow.startQuickFocus}
+            timeFormat={flow.data.timeFormat}
+          />
+        )}
+        {flow.tab === 'planner' && (
+          <PlannerScreen
+            tasks={flow.data.tasks}
+            filter={flow.filter}
+            completedCount={flow.completedCount}
+            onFilter={flow.setFilter}
+            onAdd={() => flow.setModal('task')}
+            onToggle={flow.toggleTask}
+            onDelete={flow.deleteTask}
             timeFormat={flow.data.timeFormat}
           />
         )}
@@ -104,21 +138,30 @@ export default function App() {
             onSettings={flow.openTimerSettings}
             onToggleTimer={flow.timerRunning ? flow.pauseFocusTimer : flow.startFocusTimer}
             onReset={flow.resetFocusTimer}
-            onQuickFocus={flow.startFocusTimer}
+            onQuickFocus={flow.startQuickFocus}
+          />
+        )}
+        {flow.tab === 'alarms' && (
+          <AlarmsScreen
+            alarms={flow.data.alarms}
+            onAddAlarm={() => flow.setModal('alarm')}
+            onToggleAlarm={flow.changeAlarmActive}
+            onDeleteAlarm={flow.deleteAlarm}
+            timeFormat={flow.data.timeFormat}
           />
         )}
         {flow.tab === 'blocking' && (
           <BlockingScreen
             blockedApps={flow.data.blockedApps}
             schedules={flow.data.schedules}
-            onAddApp={flow.openAddAppModal}
+            onAddApp={flow.openAddAppPicker}
             onRemoveApp={flow.removeBlockedApp}
             onToggleApp={flow.toggleBlockedApp}
             onAddSchedule={flow.openAddScheduleModal}
             onRemoveSchedule={flow.removeSchedule}
             onToggleSchedule={flow.toggleSchedule}
-            onOpenPermissions={flow.openPermissions}
             timeFormat={flow.data.timeFormat}
+            accessibilityEnabled={flow.accessibilityEnabled}
           />
         )}
         {flow.tab === 'stats' && (
@@ -137,6 +180,7 @@ export default function App() {
             onExportData={flow.exportData}
           />
         )}
+        </Animated.View>
       </ScrollView>
 
       <AlarmFormModal
@@ -182,6 +226,24 @@ export default function App() {
         settings={flow.settings}
         setSettings={flow.setSettings}
       />
+      <ScheduleFormModal
+        visible={flow.modal === 'schedule'}
+        onClose={closeForm}
+        onSave={flow.addSchedule}
+        startTime={flow.newScheduleStart}
+        setStartTime={flow.setNewScheduleStart}
+        endTime={flow.newScheduleEnd}
+        setEndTime={flow.setNewScheduleEnd}
+        days={flow.newScheduleDays}
+        setDays={flow.setNewScheduleDays}
+      />
+      <AppPickerModal
+        visible={flow.modal === 'appPicker'}
+        onClose={closeForm}
+        onSelect={flow.selectAppToBlock}
+        apps={flow.installedApps}
+        loading={flow.loadingApps}
+      />
       <RingingAlarmModal
         alarm={flow.ringing}
         mathQuestion={flow.mathQuestion.text}
@@ -215,13 +277,13 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, flexShrink: 1 },
   brandIcon: { width: 44, height: 44, borderRadius: RADII.md, backgroundColor: COLORS.primaryStrong, alignItems: 'center', justifyContent: 'center' },
-  brandIconText: { fontSize: TYPE.icon, color: COLORS.white, fontWeight: '700' },
   brandTitle: { fontSize: TYPE.headingSmall, fontWeight: '800', color: COLORS.text, letterSpacing: TRACKING.subtle },
   headerSubtitle: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs / 2 },
   clockBox: { alignItems: 'flex-end' },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body },
   tabsViewport: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center' },
   tabs: { paddingHorizontal: LAYOUT.screenGutter, paddingBottom: SPACE.md, gap: SPACE.sm },
+  activityContent: { width: '100%' },
   tab: {
     minHeight: 44,
     paddingHorizontal: SPACE.lg,

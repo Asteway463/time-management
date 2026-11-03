@@ -1,16 +1,19 @@
 import type { AppData, Alarm, Tab, Category } from './types';
+import type { AppIconName } from './components/AppIcon';
 
 export const STORAGE_KEY = 'asttime-state-v1';
 
 export const CATEGORIES: Category[] = ['Work', 'Study', 'Exercise', 'Rest'];
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-export const TAB_LABELS: { id: Tab; label: string }[] = [
-  { id: 'home', label: 'Home' },
-  { id: 'focus', label: 'Focus' },
-  { id: 'blocking', label: 'Blocking' },
-  { id: 'stats', label: 'Stats' },
-  { id: 'settings', label: 'Settings' },
+export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'planner', label: 'Planner', icon: 'planner' },
+  { id: 'focus', label: 'Focus', icon: 'focus' },
+  { id: 'alarms', label: 'Alarms', icon: 'alarm' },
+  { id: 'blocking', label: 'Blocking', icon: 'blocking' },
+  { id: 'stats', label: 'Stats', icon: 'stats' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 export const todayKey = (date = new Date()) =>
@@ -73,8 +76,9 @@ export const nextAlarmDate = (alarm: Alarm) => {
 };
 
 export const formatDuration = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
   return hours ? `${hours}h ${rest}m` : `${rest}m`;
 };
 

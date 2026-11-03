@@ -1,122 +1,92 @@
 import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
-import { formatTime, WEEKDAYS } from '../constants';
-import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import { formatTime, WEEKDAY_NAMES } from '../constants';
+import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { Alarm, TimeFormat } from '../types';
 
 type Props = {
   alarms: Alarm[];
-  nextAlarm?: { alarm: Alarm; date: Date };
-  onAdd: () => void;
-  onToggle: (id: string, active: boolean) => void;
-  onDelete: (id: string) => void;
+  onAddAlarm: () => void;
+  onToggleAlarm: (id: string, active: boolean) => void;
+  onDeleteAlarm: (id: string) => void;
   timeFormat: TimeFormat;
 };
 
-export function AlarmsScreen({ alarms, nextAlarm, onAdd, onToggle, onDelete, timeFormat }: Props) {
+export function AlarmsScreen({
+  alarms,
+  onAddAlarm,
+  onToggleAlarm,
+  onDeleteAlarm,
+  timeFormat,
+}: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
+  const sortedAlarms = [...alarms].sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return a.time.localeCompare(b.time);
+  });
+
   return (
     <View style={styles.content}>
       <ScreenHeading
-        title="Alarm manager"
-        subtitle="Get reminders for the moments that matter."
-        action={<Button title="+ Add" onPress={onAdd} small />}
+        title="Alarms"
+        subtitle="Set reminders for the moments that matter."
+        action={<Button title="Add alarm" onPress={onAddAlarm} small />}
       />
-      <Card style={styles.nextAlarmCard}>
-        <Text style={styles.eyebrow}>NEXT ALARM</Text>
-        <Text style={styles.nextAlarmTime}>{nextAlarm ? formatTime(nextAlarm.alarm.time, timeFormat) : '--:--'}</Text>
-        <Text style={styles.muted}>
-          {nextAlarm ? `${nextAlarm.alarm.label} · ${nextAlarm.alarm.category}` : 'No active alarms scheduled'}
-        </Text>
-        {nextAlarm && (
-          <Text style={styles.smallMuted}>
-            At {nextAlarm.date.toLocaleDateString()} · {formatTime(nextAlarm.alarm.time, timeFormat)}
-          </Text>
-        )}
-      </Card>
-      {alarms.length === 0 && <EmptyCard text="No alarms yet. Add your first alarm to get started." />}
-      {alarms.map((alarm) => (
-        <Card key={alarm.id} style={styles.alarmCard}>
-          <View style={styles.rowBetween}>
-            <View style={styles.flex}>
-              <Text style={styles.tag}>{alarm.category}{alarm.challenge === 'math' ? ' · Math challenge' : ''}</Text>
-              <Text style={styles.alarmTime}>{formatTime(alarm.time, timeFormat)}</Text>
-              <Text style={styles.cardText}>{alarm.label}</Text>
-            </View>
-            <Switch
-              accessibilityLabel={`Toggle ${alarm.label}`}
-              value={alarm.active}
-              onValueChange={(value) => onToggle(alarm.id, value)}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.text}
-            />
-          </View>
-          <View style={styles.dayRow}>
-            {WEEKDAYS.map((day, index) => (
-              <View key={`${alarm.id}-${index}`} style={[styles.dayDot, alarm.days.includes(index) && styles.dayDotActive]}>
-                <Text style={[styles.dayText, alarm.days.includes(index) && styles.dayTextActive]}>{day}</Text>
+
+      {sortedAlarms.length === 0 ? (
+        <EmptyCard text="No alarms yet. Add one to get a reminder at a specific time." />
+      ) : (
+        sortedAlarms.map((alarm) => {
+          const repeat = alarm.days.length === 0
+            ? 'One time'
+            : alarm.days.map((day) => WEEKDAY_NAMES[day].slice(0, 3)).join(', ');
+          return (
+            <Card key={alarm.id}>
+              <View style={styles.rowBetween}>
+                <View style={styles.flex}>
+                  <Text style={[styles.time, !alarm.active && styles.inactive]}>{formatTime(alarm.time, timeFormat)}</Text>
+                  <Text style={[styles.label, !alarm.active && styles.inactive]} numberOfLines={1}>{alarm.label}</Text>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {repeat} · {alarm.category}{alarm.challenge === 'math' ? ' · Math challenge' : ''}
+                  </Text>
+                </View>
+                <Switch
+                  accessibilityLabel={`${alarm.active ? 'Disable' : 'Enable'} ${alarm.label} alarm`}
+                  value={alarm.active}
+                  onValueChange={(active) => onToggleAlarm(alarm.id, active)}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                />
               </View>
-            ))}
-            <Text style={styles.smallMuted}>{alarm.days.length ? 'Repeats weekly' : 'One time'}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${alarm.label}`}
-              hitSlop={4}
-              onPress={() => onDelete(alarm.id)}
-              style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.deleteText}>Delete</Text>
-            </Pressable>
-          </View>
-        </Card>
-      ))}
-      <Text style={styles.note}>
-        Notifications depend on OS permissions and power settings. Expo alarms are reminders, not guaranteed full-screen system-clock alarms.
-      </Text>
+              <View style={styles.actions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${alarm.label} alarm`}
+                  onPress={() => onDeleteAlarm(alarm.id)}
+                  style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.deleteText}>Delete</Text>
+                </Pressable>
+              </View>
+            </Card>
+          );
+        })
+      )}
     </View>
   );
 }
 
 const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
-  nextAlarmCard: { alignItems: 'center', paddingVertical: SPACE.xl },
-  eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label },
-  nextAlarmTime: { color: COLORS.green, fontSize: TYPE.displayLarge, fontWeight: '800', marginTop: SPACE.xs, fontVariant: ['tabular-nums'] },
-  muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body, textAlign: 'center' },
-  smallMuted: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs },
-  alarmCard: { gap: SPACE.md },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
   flex: { flex: 1, minWidth: 0 },
-  tag: {
-    color: COLORS.primarySoft,
-    backgroundColor: COLORS.primaryMuted,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
-    paddingHorizontal: SPACE.sm,
-    paddingVertical: SPACE.xs,
-    borderRadius: RADII.sm,
-    fontSize: TYPE.caption,
-    fontWeight: '700',
-  },
-  alarmTime: { color: COLORS.text, fontSize: TYPE.display, fontWeight: '800', marginTop: SPACE.sm, fontVariant: ['tabular-nums'] },
-  cardText: { color: COLORS.textSecondary, fontSize: TYPE.body, fontWeight: '600' },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: SPACE.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: SPACE.md,
-  },
-  dayDot: { width: 26, height: 26, borderRadius: RADII.sm, backgroundColor: COLORS.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
-  dayDotActive: { backgroundColor: COLORS.primaryStrong },
-  dayText: { color: COLORS.muted, fontSize: TYPE.micro, fontWeight: '700' },
-  dayTextActive: { color: COLORS.white },
-  deleteButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: SPACE.xs },
+  time: { color: COLORS.text, fontSize: TYPE.heading, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  label: { color: COLORS.textSecondary, fontSize: TYPE.body, fontWeight: '600', marginTop: SPACE.xs },
+  meta: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs },
+  inactive: { color: COLORS.muted },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end' },
+  deleteButton: { minHeight: 36, paddingHorizontal: SPACE.md, borderRadius: RADII.sm, justifyContent: 'center', backgroundColor: COLORS.redMuted },
   deleteText: { color: COLORS.red, fontSize: TYPE.small, fontWeight: '700' },
-  pressed: { opacity: 0.72 },
-  note: { color: COLORS.muted, fontSize: TYPE.caption, lineHeight: LINE_HEIGHT.body, paddingHorizontal: SPACE.xs },
+  pressed: { opacity: 0.78 },
 });

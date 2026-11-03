@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
 import { formatTime } from '../constants';
-import { LAYOUT, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { BlockedApp, BlockSchedule, TimeFormat } from '../types';
 
 type Props = {
@@ -14,8 +14,8 @@ type Props = {
   onAddSchedule: () => void;
   onRemoveSchedule: (id: string) => void;
   onToggleSchedule: (id: string, enabled: boolean) => void;
-  onOpenPermissions: () => void;
   timeFormat: TimeFormat;
+  accessibilityEnabled: boolean;
 };
 
 export function BlockingScreen({
@@ -27,8 +27,8 @@ export function BlockingScreen({
   onAddSchedule,
   onRemoveSchedule,
   onToggleSchedule,
-  onOpenPermissions,
   timeFormat,
+  accessibilityEnabled,
 }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
@@ -36,18 +36,20 @@ export function BlockingScreen({
     <View style={styles.content}>
       <ScreenHeading
         title="App blocking"
-        subtitle="Block distracting apps during focus sessions."
+        subtitle="App blocking requires a custom native Android service, which is not included in this Expo app."
         action={<Button title="Add app" onPress={onAddApp} small />}
       />
 
       <Card>
         <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>Accessibility service</Text>
+          <Text style={styles.cardTitle}>Expo managed app</Text>
+          <View style={[styles.statusBadge, accessibilityEnabled ? styles.statusActive : styles.statusInactive]}>
+            <Text style={styles.statusText}>Unavailable</Text>
+          </View>
         </View>
         <Text style={styles.muted}>
-          Enable the AST Time Focus Blocker to actively prevent access to selected apps during focus sessions.
+          {'Expo does not allow apps to inspect or block other installed apps. Your existing app list and schedules are kept as saved data.'}
         </Text>
-        <Button title="Grant permission" onPress={onOpenPermissions} variant="secondary" />
       </Card>
 
       <Card>
@@ -79,7 +81,7 @@ export function BlockingScreen({
       <Card>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>Blocking schedules</Text>
-          <Button title="+ Add" onPress={onAddSchedule} small variant="secondary" />
+          <Button title="Add" icon="plus" onPress={onAddSchedule} small variant="secondary" />
         </View>
         {schedules.length === 0 && (
           <Text style={styles.muted}>No schedules set. Add one to auto-block apps at specific times.</Text>
@@ -110,6 +112,10 @@ export function BlockingScreen({
 const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
+  statusBadge: { paddingHorizontal: SPACE.sm, paddingVertical: SPACE.xs / 2, borderRadius: RADII.pill },
+  statusActive: { backgroundColor: COLORS.greenMuted },
+  statusInactive: { backgroundColor: COLORS.redMuted },
+  statusText: { fontSize: TYPE.micro, fontWeight: '700', color: COLORS.white },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700' },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: 20 },
   flex: { flex: 1, minWidth: 0 },
