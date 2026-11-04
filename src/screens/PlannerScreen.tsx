@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, ChoiceRow, EmptyCard, ScreenHeading, TaskRow } from '../components/Common';
 import { CATEGORIES } from '../constants';
 import { LAYOUT, SPACE, TYPE, useThemedStyles, type ThemeColors } from '../theme';
@@ -19,6 +19,16 @@ type Props = {
 export function PlannerScreen({ tasks, filter, completedCount, onFilter, onAdd, onToggle, onDelete, timeFormat }: Props) {
   const styles = useThemedStyles(createStyles);
   const filteredTasks = tasks.filter((task) => filter === 'All' || task.category === filter);
+  const confirmDelete = (task: Task) => {
+    Alert.alert(
+      'Delete task?',
+      `"${task.title}" will be removed from this device.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(task.id) },
+      ],
+    );
+  };
   return (
     <View style={styles.content}>
       <ScreenHeading
@@ -33,7 +43,7 @@ export function PlannerScreen({ tasks, filter, completedCount, onFilter, onAdd, 
       {filteredTasks.length === 0 && <EmptyCard text="No tasks match this view. Add one to plan your time." />}
       {filteredTasks.map((task) => (
         <Card key={task.id}>
-          <TaskRow task={task} onToggle={() => onToggle(task.id)} onDelete={() => onDelete(task.id)} timeFormat={timeFormat} />
+          <TaskRow task={task} onToggle={() => onToggle(task.id)} onDelete={() => confirmDelete(task)} timeFormat={timeFormat} />
         </Card>
       ))}
     </View>

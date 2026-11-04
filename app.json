@@ -1,12 +1,22 @@
 {
   "expo": {
-    "name": "AST Time",
+    "name": "Atna's Flow",
     "slug": "asttime",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#081321",
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#081321",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -14,14 +24,19 @@
           "enableRemoteNotifications": false
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Atna's Flow uses your photo library only when you choose a background image.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       "expo-status-bar"
     ],
     "ios": {
       "bundleIdentifier": "com.asteway.chronoflow",
-      "supportsTablet": true,
-      "runtimeVersion": {
-        "policy": "appVersion"
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -32,8 +47,18 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.asteway.chronoflow",
-      "versionCode": 3,
-      "runtimeVersion": "1.0.0"
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,9 +68,6 @@
         "projectId": "0217f75e-a897-4345-8a63-8f6441904b7b"
       }
     },
-    "owner": "asteway",
-    "updates": {
-      "url": "https://u.expo.dev/0217f75e-a897-4345-8a63-8f6441904b7b"
-    }
+    "owner": "asteway"
   }
 }

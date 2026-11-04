@@ -1,16 +1,18 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, type ComponentRef, type RefObject } from 'react';
+import type { View } from 'react-native';
 
 export const COLORS = {
   background: '#081321',
   surface: '#101E2F',
   surfaceRaised: '#192A3F',
   surfaceInset: '#0C1929',
+  surfaceGlass: 'rgba(16, 30, 47, 0.42)',
   border: '#263A50',
   text: '#F4F7FB',
   textSecondary: '#D7E0EB',
   muted: '#98A8BC',
   primary: '#8188FF',
-  primaryStrong: '#6971F2',
+  primaryStrong: '#5A62E6',
   primarySoft: '#B6BAFF',
   primaryMuted: '#252F55',
   green: '#53D7A5',
@@ -19,6 +21,7 @@ export const COLORS = {
   amberMuted: '#3A3223',
   red: '#F47C8B',
   redMuted: '#3A202D',
+  danger: '#C63D54',
   white: '#FFFFFF',
   overlay: 'rgba(2, 8, 16, 0.78)',
 } as const;
@@ -28,20 +31,22 @@ export const LIGHT_COLORS = {
   surface: '#FFFFFF',
   surfaceRaised: '#EEF2F7',
   surfaceInset: '#E4E9F2',
+  surfaceGlass: 'rgba(255, 255, 255, 0.52)',
   border: '#D4DAE4',
   text: '#1A2233',
   textSecondary: '#4A5568',
-  muted: '#7B8799',
-  primary: '#5B6AFF',
+  muted: '#59657A',
+  primary: '#4453E0',
   primaryStrong: '#4A58E6',
-  primarySoft: '#8B95FF',
+  primarySoft: '#4E59D6',
   primaryMuted: '#E3E7FF',
-  green: '#1DBD7A',
+  green: '#0C7048',
   greenMuted: '#DFF7EC',
-  amber: '#E8A23C',
+  amber: '#8A5500',
   amberMuted: '#FDF3E0',
-  red: '#E0546A',
+  red: '#B3263E',
   redMuted: '#FDE8EC',
+  danger: '#B3263E',
   white: '#FFFFFF',
   overlay: 'rgba(15, 23, 42, 0.5)',
 } as const;
@@ -49,6 +54,19 @@ export const LIGHT_COLORS = {
 export type ThemeColors = { [Key in keyof typeof COLORS]: string };
 
 export const ThemeColorsContext = createContext<ThemeColors>(COLORS);
+
+export type BlurTargetRef = RefObject<ComponentRef<typeof View> | null>;
+
+/**
+ * Ref to the background that frosted cards blur on Android. `expo-blur`
+ * requires an explicit target on that platform; without one it silently falls
+ * back to a plain translucent view.
+ */
+export const BlurTargetContext = createContext<BlurTargetRef | null>(null);
+
+export function useBlurTarget(): BlurTargetRef | null {
+  return useContext(BlurTargetContext);
+}
 
 export function useThemeColors(): ThemeColors {
   return useContext(ThemeColorsContext);

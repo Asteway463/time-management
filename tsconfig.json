@@ -3,7 +3,9 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["react"]
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["react", "node"]
   },
   "exclude": ["node_modules", "dist"]
 }

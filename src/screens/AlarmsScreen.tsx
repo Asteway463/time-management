@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
 import { formatTime, WEEKDAY_NAMES } from '../constants';
 import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
@@ -22,6 +22,16 @@ export function AlarmsScreen({
 }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
+  const confirmDelete = (alarm: Alarm) => {
+    Alert.alert(
+      'Delete alarm?',
+      `"${alarm.label}" will be removed from this device.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDeleteAlarm(alarm.id) },
+      ],
+    );
+  };
   const sortedAlarms = [...alarms].sort((a, b) => {
     if (a.active !== b.active) return a.active ? -1 : 1;
     return a.time.localeCompare(b.time);
@@ -63,7 +73,7 @@ export function AlarmsScreen({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Delete ${alarm.label} alarm`}
-                  onPress={() => onDeleteAlarm(alarm.id)}
+                  onPress={() => confirmDelete(alarm)}
                   style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
                 >
                   <Text style={styles.deleteText}>Delete</Text>
@@ -86,7 +96,7 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   meta: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs },
   inactive: { color: COLORS.muted },
   actions: { flexDirection: 'row', justifyContent: 'flex-end' },
-  deleteButton: { minHeight: 36, paddingHorizontal: SPACE.md, borderRadius: RADII.sm, justifyContent: 'center', backgroundColor: COLORS.redMuted },
+  deleteButton: { minHeight: 44, paddingHorizontal: SPACE.lg, borderRadius: RADII.sm, justifyContent: 'center', backgroundColor: COLORS.redMuted },
   deleteText: { color: COLORS.red, fontSize: TYPE.small, fontWeight: '700' },
   pressed: { opacity: 0.78 },
 });

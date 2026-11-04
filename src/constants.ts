@@ -1,7 +1,9 @@
-import type { AppData, Alarm, Tab, Category } from './types';
+import type { AppData, FocusTimerState, Tab, Category } from './types';
 import type { AppIconName } from './components/AppIcon';
 
 export const STORAGE_KEY = 'asttime-state-v1';
+
+export const APP_NAME = "Atna's Flow";
 
 export const CATEGORIES: Category[] = ['Work', 'Study', 'Exercise', 'Rest'];
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -11,7 +13,6 @@ export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
   { id: 'planner', label: 'Planner', icon: 'planner' },
   { id: 'focus', label: 'Focus', icon: 'focus' },
   { id: 'alarms', label: 'Alarms', icon: 'alarm' },
-  { id: 'blocking', label: 'Blocking', icon: 'blocking' },
   { id: 'stats', label: 'Stats', icon: 'stats' },
   { id: 'notebook', label: 'Notebook', icon: 'app' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
@@ -20,11 +21,18 @@ export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
 export const todayKey = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+export const createDefaultTimer = (workMins = 25): FocusTimerState => ({
+  mode: 'work',
+  running: false,
+  endsAt: null,
+  remainingSeconds: workMins * 60,
+  sessionStartedAt: null,
+});
+
 export const defaultData = (): AppData => ({
   alarms: [],
   tasks: [],
-  blockedApps: [],
-  schedules: [],
+  notes: [],
   focusSessions: [],
   focus: {
     workMins: 25,
@@ -32,15 +40,14 @@ export const defaultData = (): AppData => ({
     longMins: 15,
     totalFocusMinsToday: 0,
     focusDate: todayKey(),
-    linkedTaskId: '',
     dailyGoal: 60,
   },
+  timer: createDefaultTimer(),
   streak: 0,
   lastStreakDate: '',
   theme: 'system',
   timeFormat: '12h',
   notificationsEnabled: true,
-  backgroundColor: '#0B0F19',
   backgroundImage: '',
 });
 
@@ -62,27 +69,12 @@ export const nextTime = (time: string) => {
   return date;
 };
 
-export const nextAlarmDate = (alarm: Alarm) => {
-  if (alarm.days.length === 0) {
-    if (alarm.fireAt !== undefined) return alarm.fireAt > Date.now() ? new Date(alarm.fireAt) : null;
-    return nextTime(alarm.time);
-  }
-  const [hour, minute] = alarm.time.split(':').map(Number);
-  const current = new Date();
-  for (let offset = 0; offset <= 7; offset += 1) {
-    const candidate = new Date(current);
-    candidate.setDate(current.getDate() + offset);
-    candidate.setHours(hour, minute, 0, 0);
-    if (alarm.days.includes(candidate.getDay()) && candidate.getTime() > current.getTime()) return candidate;
-  }
-  return null;
-};
-
 export const formatDuration = (minutes: number) => {
   const total = Math.max(0, Math.round(minutes));
   const hours = Math.floor(total / 60);
   const rest = total % 60;
-  return hours ? `${hours}h ${rest}m` : `${rest}m`;
+  if (!hours) return `${rest}m`;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
 };
 
 export const formatCountdown = (seconds: number) => {

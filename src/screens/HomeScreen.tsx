@@ -1,9 +1,8 @@
 import React from 'react';
-import { Image } from 'react-native';
-import { StyleSheet, Text, View } from 'react-native';
-import { Button, Card, EmptyCard, Metric, ProgressBar, ScreenHeading, TaskRow } from '../components/Common';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { Button, Card, EmptyCard, Metric, ProgressBar, TaskRow } from '../components/Common';
 import { AppIcon } from '../components/AppIcon';
-import { formatDuration } from '../constants';
+import { APP_NAME, formatDuration } from '../constants';
 import { LAYOUT, LINE_HEIGHT, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, Tab, TimeFormat } from '../types';
 
@@ -41,8 +40,8 @@ export function HomeScreen({
     <View style={styles.content}>
       <Card style={styles.heroCard}>
         <Image source={require('../../assets/icon.png')} style={{ width: 48, height: 48, marginBottom: 8, alignSelf: 'center', borderRadius: 12 }} />
-        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 2 }}>ATNA Timmer</Text>
-        <Text style={styles.eyebrow}>TODAY'S FOCUS</Text>
+        <Text style={styles.heroTitle}>{APP_NAME}</Text>
+        <Text style={styles.eyebrow}>{"TODAY'S FOCUS"}</Text>
         <Text style={styles.focusTime}>{formatDuration(data.focus.totalFocusMinsToday)}</Text>
         <Text style={styles.muted}>of {formatDuration(data.focus.dailyGoal)} goal</Text>
         <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: goalProgress }} style={{ width: '100%' }}>
@@ -60,7 +59,7 @@ export function HomeScreen({
 
       <Card>
         <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>Today's tasks</Text>
+          <Text style={styles.cardTitle}>{"Today's tasks"}</Text>
           <Button title="Add" icon="plus" onPress={onAddTask} small variant="secondary" />
         </View>
         {hasTasks ? (
@@ -81,7 +80,7 @@ export function HomeScreen({
       </Card>
 
       <View style={styles.streak}><AppIcon name="spark" size={17} color={colors.amber} /><Text style={styles.streakText}>{data.streak} day streak</Text></View>
-      <Text style={{ color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 4 }}>Built with Asteway · © 2026</Text>
+      <Text style={styles.footer}>{APP_NAME}. Asteway Teshome · © 2026</Text>
     </View>
   );
 }
@@ -89,13 +88,14 @@ export function HomeScreen({
 const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   content: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center', gap: SPACE.md },
   heroCard: { alignItems: 'center', paddingVertical: SPACE.xxl, gap: SPACE.xs },
+  heroTitle: { color: COLORS.text, fontSize: TYPE.headingSmall, fontWeight: '800', textAlign: 'center', marginBottom: 2 },
   eyebrow: { color: COLORS.primarySoft, fontSize: TYPE.caption, fontWeight: '800', letterSpacing: TRACKING.label },
   focusTime: { color: COLORS.text, fontSize: TYPE.display, fontWeight: '800', fontVariant: ['tabular-nums'] },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body },
-  quickButton: { marginTop: SPACE.md, width: '100%' },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.md },
   cardTitle: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '700' },
   streak: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.xs, padding: SPACE.sm },
   streakText: { color: COLORS.amber, fontWeight: '700' },
+  footer: { color: COLORS.muted, fontSize: TYPE.caption, textAlign: 'center', marginTop: SPACE.xs },
 });

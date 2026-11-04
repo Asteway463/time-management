@@ -1,30 +1,22 @@
 import * as Notifications from 'expo-notifications';
 import * as Speech from 'expo-speech';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Platform, Share } from 'react-native';
-import { defaultData, nextAlarmDate, nextTime, todayKey, validTime } from './constants';
+import { APP_NAME, defaultData, nextTime, todayKey, validTime } from './constants';
+import { effectiveStreak, reactivateAlarm, recoverTimer, shouldRingForNotification, timerForMode } from './logic';
 import {
   scheduleFocusCompletionNotificationAsync,
   syncAlarmNotificationsAsync,
 } from './notifications';
-import {
-  clearNativeBlockState,
-  getInstalledApps,
-  isAccessibilityEnabled as checkAccessibility,
-  isNativeBlockingAvailable,
-  openAccessibilitySettings,
-  setNativeBlockState,
-  type InstalledApp,
-} from './services/appBlocking';
+import { removeBackgroundImage } from './services/backgroundImage';
 import { loadAppData, saveAppData } from './storage';
 import type {
   Alarm,
   AppData,
-  BlockSchedule,
-  BlockedApp,
   Category,
   FocusMode,
   FocusSession,
+  Note,
   Priority,
   Tab,
   Task,
@@ -40,38 +32,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
-function getActiveScheduleEnd(schedules: BlockSchedule[], now: Date): number | null {
-  let earliestEnd: number | null = null;
-  for (const schedule of schedules) {
-    if (!schedule.enabled || schedule.days.length === 0) continue;
-    const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
-    const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
-    if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) continue;
+const MINIMUM_SPLASH_MS = 2300;
 
-    const start = new Date(now);
-    start.setHours(startHour, startMinute, 0, 0);
-    if (start.getTime() > now.getTime()) start.setDate(start.getDate() - 1);
+const createId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const end = new Date(start);
-    end.setHours(endHour, endMinute, 0, 0);
-    if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1);
-
-    const isActive = schedule.days.includes(start.getDay())
-      && now.getTime() >= start.getTime()
-      && now.getTime() < end.getTime();
-    if (isActive && (earliestEnd === null || end.getTime() < earliestEnd)) {
-      earliestEnd = end.getTime();
-    }
-  }
-  return earliestEnd;
-}
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 export function useChronoFlow() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>('home');
   const [filter, setFilter] = useState<Category | 'All'>('All');
-  const [modal, setModal] = useState<'alarm' | 'task' | 'settings' | 'appPicker' | 'schedule' | null>(null);
+  const [modal, setModal] = useState<'alarm' | 'task' | 'settings' | null>(null);
   const [ringing, setRinging] = useState<Alarm | null>(null);
   const [mathQuestion, setMathQuestion] = useState({ text: '', answer: 0 });
   const [mathInput, setMathInput] = useState('');
@@ -91,17 +65,7 @@ export function useChronoFlow() {
   const [remaining, setRemaining] = useState(25 * 60);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerEndAt, setTimerEndAt] = useState<number | null>(null);
-  const [isBlocking, setIsBlocking] = useState(false);
-  const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
-  const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
-  const [loadingApps, setLoadingApps] = useState(false);
-  const [addAppModal, setAddAppModal] = useState(false);
-  const [addScheduleModal, setAddScheduleModal] = useState(false);
-  const [newAppPackage, setNewAppPackage] = useState('');
-  const [newAppLabel, setNewAppLabel] = useState('');
-  const [newScheduleStart, setNewScheduleStart] = useState('21:00');
-  const [newScheduleEnd, setNewScheduleEnd] = useState('23:00');
-  const [newScheduleDays, setNewScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
+
   const lastFiredRef = useRef('');
   const timerNotificationRef = useRef<string | null>(null);
   const timerNotificationGenerationRef = useRef(0);
@@ -111,7 +75,7 @@ export function useChronoFlow() {
 
   dataRef.current = data;
 
-  const persist = (next: AppData) => {
+  const persist = useCallback((next: AppData) => {
     persistQueueRef.current = persistQueueRef.current.then(async () => {
       try {
         await saveAppData(next);
@@ -119,14 +83,14 @@ export function useChronoFlow() {
         Alert.alert('Could not save changes', String(error));
       }
     });
-  };
+  }, []);
 
   const updateData = useCallback((updater: (current: AppData) => AppData) => {
     const next = updater(dataRef.current);
     dataRef.current = next;
     setData(next);
-    void persist(next);
-  }, []);
+    persist(next);
+  }, [persist]);
 
   const syncNotifications = useCallback(async (alarms: Alarm[], askPermission: boolean) => {
     if (Platform.OS === 'web') return;
@@ -151,19 +115,68 @@ export function useChronoFlow() {
     }
   }, []);
 
+  const ringAlarm = useCallback((alarm: Alarm) => {
+    const a = Math.floor(Math.random() * 20) + 5;
+    const b = Math.floor(Math.random() * 20) + 5;
+    setMathQuestion({ text: `${a} + ${b} = ?`, answer: a + b });
+    setMathInput('');
+    setMathError(false);
+    setRinging(alarm);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
+
     const load = async () => {
+      const startedAt = Date.now();
       try {
-        const loadedData = await loadAppData();
-        if (mounted) setData(loadedData);
+        const stored = await loadAppData();
+        let restored = stored;
+
+        const streak = effectiveStreak(stored.streak, stored.lastStreakDate);
+        if (streak !== stored.streak) restored = { ...restored, streak };
+
+        const recovery = recoverTimer(restored);
+        restored = recovery.data;
+
+        if (!mounted) return;
+        dataRef.current = restored;
+        setData(restored);
+        setFocusMode(restored.timer.mode);
+        setRemaining(restored.timer.remainingSeconds);
+        setTimerRunning(restored.timer.running);
+        setTimerEndAt(restored.timer.endsAt);
+        focusSessionStartedAtRef.current = restored.timer.running
+          ? restored.timer.sessionStartedAt
+          : null;
+
+        try {
+          await saveAppData(restored);
+        } catch {
+          // A failed save is reported by the next update; loading still succeeds.
+        }
+
+        if (recovery.completedSession) {
+          setTimeout(() => {
+            if (mounted) {
+              Alert.alert('Focus session complete', 'Your focus session finished while the app was closed.');
+            }
+          }, 350);
+        }
       } catch (error) {
-        Alert.alert('Could not load saved data', String(error));
+        if (mounted) {
+          Alert.alert(
+            'Could not load saved data',
+            `${String(error)} A recovery copy was kept on this device, and ${APP_NAME} opened with a clean state.`,
+          );
+        }
       } finally {
-        await new Promise((r) => setTimeout(r, 3500));
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < MINIMUM_SPLASH_MS) await delay(MINIMUM_SPLASH_MS - elapsed);
         if (mounted) setLoaded(true);
       }
     };
+
     void load();
     return () => {
       mounted = false;
@@ -176,54 +189,10 @@ export function useChronoFlow() {
   }, [loaded, syncNotifications]);
 
   useEffect(() => {
-    const checkAccess = async () => {
-      const enabled = await checkAccessibility();
-      setAccessibilityEnabled(enabled);
-    };
-    checkAccess();
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') checkAccess();
-    });
-    return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!loaded || timerRunning) return;
-    if (Platform.OS !== 'android' || !isNativeBlockingAvailable()) return;
-
-    const applySchedules = () => {
-      const packages = dataRef.current.blockedApps
-        .filter((app) => app.blockDuringFocus)
-        .map((app) => app.packageName);
-      const endAt = accessibilityEnabled
-        ? getActiveScheduleEnd(dataRef.current.schedules, new Date())
-        : null;
-
-      if (endAt !== null && packages.length > 0) {
-        setNativeBlockState(packages, 'Scheduled focus block', endAt);
-        setIsBlocking(true);
-      } else {
-        clearNativeBlockState();
-        setIsBlocking(false);
-      }
-    };
-
-    applySchedules();
-    const interval = setInterval(applySchedules, 60_000);
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') applySchedules();
-    });
-    return () => {
-      clearInterval(interval);
-      subscription.remove();
-    };
-  }, [loaded, timerRunning, accessibilityEnabled, data.schedules, data.blockedApps]);
-
-  useEffect(() => {
     if (!loaded) return;
     const resetFocusDay = () => {
       const today = todayKey();
-      if (data.focus.focusDate !== today) {
+      if (dataRef.current.focus.focusDate !== today) {
         updateData((current) => ({
           ...current,
           focus: { ...current.focus, focusDate: today, totalFocusMinsToday: 0 },
@@ -233,81 +202,111 @@ export function useChronoFlow() {
     resetFocusDay();
     const interval = setInterval(resetFocusDay, 60_000);
     return () => clearInterval(interval);
-  }, [loaded, data.focus.focusDate, updateData]);
+  }, [loaded, updateData]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (!loaded) return;
+
+    const tick = () => {
       const current = new Date();
-      const expiredIds = data.alarms
-        .filter((alarm) => alarm.active && alarm.days.length === 0 && alarm.fireAt !== undefined && current.getTime() >= alarm.fireAt + 60_000)
+      const now = current.getTime();
+      const alarms = dataRef.current.alarms;
+
+      const expiredIds = alarms
+        .filter((alarm) => alarm.active && alarm.days.length === 0
+          && alarm.fireAt !== undefined && now >= alarm.fireAt + 60_000)
         .map((alarm) => alarm.id);
+
       if (expiredIds.length > 0) {
         updateData((currentData) => ({
           ...currentData,
-          alarms: currentData.alarms.map((alarm) => expiredIds.includes(alarm.id) ? { ...alarm, active: false } : alarm),
+          alarms: currentData.alarms.map((alarm) =>
+            expiredIds.includes(alarm.id) ? { ...alarm, active: false } : alarm),
         }));
+        void syncNotifications(dataRef.current.alarms, false);
         return;
       }
+
       const minute = `${todayKey(current)}-${current.getHours()}:${current.getMinutes()}`;
-      for (const alarm of data.alarms) {
-        const time = `${String(current.getHours()).padStart(2, '0')}:${String(current.getMinutes()).padStart(2, '0')}`;
+      const time = `${String(current.getHours()).padStart(2, '0')}:${String(current.getMinutes()).padStart(2, '0')}`;
+      for (const alarm of alarms) {
+        if (!alarm.active) continue;
         const oneTimeDue = alarm.days.length === 0
           && alarm.fireAt !== undefined
-          && current.getTime() >= alarm.fireAt
-          && current.getTime() < alarm.fireAt + 60_000;
+          && now >= alarm.fireAt
+          && now < alarm.fireAt + 60_000;
         const repeatsToday = alarm.days.length > 0 && alarm.days.includes(current.getDay());
         const due = alarm.days.length === 0 ? oneTimeDue : repeatsToday && alarm.time === time;
-        if (alarm.active && due && lastFiredRef.current !== `${alarm.id}-${minute}`) {
-          lastFiredRef.current = `${alarm.id}-${minute}`;
-          const a = Math.floor(Math.random() * 20) + 5;
-          const b = Math.floor(Math.random() * 20) + 5;
-          setMathQuestion({ text: `${a} + ${b} = ?`, answer: a + b });
-          setMathInput('');
-          setMathError(false);
-          setRinging(alarm);
-          if (alarm.days.length === 0) {
-            updateData((currentData) => ({
-              ...currentData,
-              alarms: currentData.alarms.map((item) => item.id === alarm.id ? { ...item, active: false } : item),
-            }));
-          }
+        if (!due || lastFiredRef.current === `${alarm.id}-${minute}`) continue;
+
+        lastFiredRef.current = `${alarm.id}-${minute}`;
+        ringAlarm(alarm);
+        if (alarm.days.length === 0) {
+          updateData((currentData) => ({
+            ...currentData,
+            alarms: currentData.alarms.map((item) =>
+              item.id === alarm.id ? { ...item, active: false } : item),
+          }));
+          void syncNotifications(dataRef.current.alarms, false);
         }
       }
-    }, 1000);
+    };
+
+    const interval = setInterval(tick, 5_000);
+    tick();
     return () => clearInterval(interval);
-  }, [data.alarms, updateData]);
+  }, [loaded, ringAlarm, syncNotifications, updateData]);
+
+  useEffect(() => {
+    if (!loaded || Platform.OS === 'web') return;
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const alarmId = response.notification.request.content.data?.alarmId;
+      if (typeof alarmId !== 'string') return;
+      const alarm = dataRef.current.alarms.find((item) => item.id === alarmId);
+      if (!alarm || !shouldRingForNotification(alarm)) return;
+      const now = new Date();
+      lastFiredRef.current = `${alarm.id}-${todayKey(now)}-${now.getHours()}:${now.getMinutes()}`;
+      ringAlarm(alarm);
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    void Notifications.getLastNotificationResponseAsync().then(async (response) => {
+      if (!response) return;
+      handleResponse(response);
+      await Notifications.clearLastNotificationResponseAsync();
+    });
+    return () => subscription.remove();
+  }, [loaded, ringAlarm]);
 
   useEffect(() => {
     if (!timerRunning || timerEndAt === null) return;
-    const interval = setInterval(() => {
-      const actualRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
-      setRemaining((current) => current === actualRemaining ? current : actualRemaining);
-    }, 250);
-    const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        const actualRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
-        setRemaining((current) => current === actualRemaining ? current : actualRemaining);
-      }
+    const refresh = () => {
+      const actual = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
+      setRemaining((current) => current === actual ? current : actual);
+    };
+    refresh();
+    const interval = setInterval(refresh, 500);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
     });
     return () => {
       clearInterval(interval);
-      appState.remove();
+      subscription.remove();
     };
   }, [timerRunning, timerEndAt]);
 
-  const cancelTimerNotification = async () => {
+  const cancelTimerNotification = useCallback(async () => {
     timerNotificationGenerationRef.current += 1;
     const notificationId = timerNotificationRef.current;
     timerNotificationRef.current = null;
     if (!notificationId || Platform.OS === 'web') return;
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
-    } catch (error) {
-      Alert.alert('Could not cancel timer notification', String(error));
+    } catch {
+      // The notification already fired or was removed by the system: nothing to do.
     }
-  };
+  }, []);
 
-  const scheduleTimerNotification = async (date: Date) => {
+  const scheduleTimerNotification = useCallback(async (date: Date) => {
     if (Platform.OS === 'web' || !dataRef.current.notificationsEnabled) return;
     const generation = ++timerNotificationGenerationRef.current;
     try {
@@ -327,66 +326,80 @@ export function useChronoFlow() {
     } catch (error) {
       Alert.alert('Could not schedule timer notification', String(error));
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (!timerRunning || remaining > 0) return;
+    if (!loaded || !timerRunning || remaining > 0) return;
+
+    const endedAt = Date.now();
+    const startedAt = focusSessionStartedAtRef.current;
+    focusSessionStartedAtRef.current = null;
     setTimerRunning(false);
     setTimerEndAt(null);
-    clearNativeBlockState();
-    setIsBlocking(false);
     void cancelTimerNotification();
+
     if (focusMode === 'work') {
-      const elapsedMinutes = focusSessionStartedAtRef.current === null
-        ? dataRef.current.focus.workMins
-        : Math.min(dataRef.current.focus.workMins, (Date.now() - focusSessionStartedAtRef.current) / 60_000);
-      const blockedApps = dataRef.current.blockedApps
-        .filter((app) => app.blockDuringFocus)
-        .map((app) => app.packageName);
-      const session: FocusSession = {
-        id: `focus-${Date.now()}`,
-        startedAt: Date.now() - Math.round(elapsedMinutes * 60_000),
-        endedAt: Date.now(),
-        duration: Math.round(elapsedMinutes),
-        mode: 'work',
-        blockedApps,
-        completed: true,
-      };
-      focusSessionStartedAtRef.current = null;
+      const elapsedMinutes = startedAt === null
+        ? 0
+        : Math.min(dataRef.current.focus.workMins, (endedAt - startedAt) / 60_000);
+      const duration = Math.round(elapsedMinutes);
+      const session: FocusSession | null = elapsedMinutes > 0
+        ? {
+          id: createId('focus'),
+          startedAt: endedAt - Math.round(elapsedMinutes * 60_000),
+          endedAt,
+          duration,
+          mode: 'work',
+          completed: true,
+        }
+        : null;
       updateData((current) => ({
         ...current,
-        focus: { ...current.focus, totalFocusMinsToday: current.focus.totalFocusMinsToday + elapsedMinutes },
-        focusSessions: [session, ...current.focusSessions].slice(0, 200),
+        focus: {
+          ...current.focus,
+          totalFocusMinsToday: current.focus.totalFocusMinsToday + elapsedMinutes,
+        },
+        focusSessions: session ? [session, ...current.focusSessions].slice(0, 200) : current.focusSessions,
+        timer: timerForMode('work', current.focus.workMins, current.focus.shortMins, current.focus.longMins),
       }));
+      setRemaining(dataRef.current.focus.workMins * 60);
       Alert.alert('Focus session complete', 'Great work. Time for a break.');
       try { Speech.speak('Great job! Focus session complete. Time for a break.'); } catch {}
     } else {
-      focusSessionStartedAtRef.current = null;
+      updateData((current) => ({
+        ...current,
+        timer: timerForMode(focusMode, current.focus.workMins, current.focus.shortMins, current.focus.longMins),
+      }));
+      const breakMinutes = focusMode === 'shortBreak'
+        ? dataRef.current.focus.shortMins
+        : dataRef.current.focus.longMins;
+      setRemaining(breakMinutes * 60);
       Alert.alert('Break complete', 'Ready to focus again?');
       try { Speech.speak('Break complete. Ready to focus again?'); } catch {}
     }
-  }, [remaining, timerRunning, focusMode, updateData]);
+  }, [cancelTimerNotification, focusMode, loaded, remaining, timerRunning, updateData]);
 
   const startTimerForMode = (mode: FocusMode, seconds: number) => {
     const durationSeconds = Math.max(1, Math.round(seconds));
-    const endAt = Date.now() + durationSeconds * 1000;
-    if (mode === 'work') {
-      if (focusSessionStartedAtRef.current === null) {
-        focusSessionStartedAtRef.current = Date.now();
-      }
-      const blockedPackages = dataRef.current.blockedApps
-        .filter((app) => app.blockDuringFocus)
-        .map((app) => app.packageName);
-      if (blockedPackages.length > 0 && accessibilityEnabled) {
-        setNativeBlockState(blockedPackages, 'Focus session active', endAt);
-        setIsBlocking(true);
-      }
-    }
+    const endsAt = Date.now() + durationSeconds * 1000;
+    const sessionStartedAt = mode === 'work' ? Date.now() : null;
+
+    focusSessionStartedAtRef.current = sessionStartedAt;
     setFocusMode(mode);
     setRemaining(durationSeconds);
-    setTimerEndAt(endAt);
+    setTimerEndAt(endsAt);
     setTimerRunning(true);
-    void scheduleTimerNotification(new Date(endAt));
+    updateData((current) => ({
+      ...current,
+      timer: {
+        mode,
+        running: true,
+        endsAt,
+        remainingSeconds: durationSeconds,
+        sessionStartedAt,
+      },
+    }));
+    void scheduleTimerNotification(new Date(endsAt));
   };
 
   const startFocusTimer = () => {
@@ -395,42 +408,107 @@ export function useChronoFlow() {
     startTimerForMode(focusMode, remaining > 0 ? remaining : minutes * 60);
   };
 
+  const pauseFocusTimer = () => {
+    const now = Date.now();
+    const actualRemaining = timerEndAt !== null
+      ? Math.max(0, Math.ceil((timerEndAt - now) / 1000))
+      : remaining;
+    const startedAt = focusSessionStartedAtRef.current;
+    focusSessionStartedAtRef.current = null;
+
+    setTimerRunning(false);
+    setTimerEndAt(null);
+    setRemaining(actualRemaining);
+    void cancelTimerNotification();
+
+    updateData((current) => {
+      let focus = current.focus;
+      let focusSessions = current.focusSessions;
+
+      if (focusMode === 'work' && startedAt !== null) {
+        const elapsedMinutes = Math.max(0, (now - startedAt) / 60_000);
+        if (elapsedMinutes > 0) {
+          focus = {
+            ...focus,
+            totalFocusMinsToday: focus.totalFocusMinsToday + elapsedMinutes,
+          };
+          const duration = Math.round(elapsedMinutes);
+          if (duration >= 1) {
+            focusSessions = [{
+              id: createId('focus'),
+              startedAt,
+              endedAt: now,
+              duration,
+              mode: 'work' as const,
+              completed: false,
+            }, ...focusSessions].slice(0, 200);
+          }
+        }
+      }
+
+      return {
+        ...current,
+        focus,
+        focusSessions,
+        timer: {
+          mode: focusMode,
+          running: false,
+          endsAt: null,
+          remainingSeconds: actualRemaining,
+          sessionStartedAt: null,
+        },
+      };
+    });
+  };
+
   const startQuickFocus = () => {
     if (timerRunning) pauseFocusTimer();
     startTimerForMode('work', dataRef.current.focus.workMins * 60);
   };
 
-  const pauseFocusTimer = () => {
-    if (timerEndAt !== null) setRemaining(Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000)));
-    if (focusMode === 'work' && focusSessionStartedAtRef.current !== null) {
-      const elapsedMinutes = (Date.now() - focusSessionStartedAtRef.current) / 60_000;
-      focusSessionStartedAtRef.current = null;
-      updateData((current) => ({
-        ...current,
-        focus: { ...current.focus, totalFocusMinsToday: current.focus.totalFocusMinsToday + elapsedMinutes },
-      }));
-    } else {
-      focusSessionStartedAtRef.current = null;
-    }
-    setTimerRunning(false);
-    setTimerEndAt(null);
-    clearNativeBlockState();
-    setIsBlocking(false);
-    void cancelTimerNotification();
-  };
-
   const selectFocusMode = (mode: FocusMode) => {
     if (timerRunning) pauseFocusTimer();
-    const minutes = mode === 'work' ? data.focus.workMins
-      : mode === 'shortBreak' ? data.focus.shortMins : data.focus.longMins;
+    const minutes = mode === 'work' ? dataRef.current.focus.workMins
+      : mode === 'shortBreak' ? dataRef.current.focus.shortMins : dataRef.current.focus.longMins;
     setFocusMode(mode);
     setRemaining(minutes * 60);
+    updateData((current) => ({
+      ...current,
+      timer: {
+        mode,
+        running: false,
+        endsAt: null,
+        remainingSeconds: minutes * 60,
+        sessionStartedAt: null,
+      },
+    }));
+  };
+
+  const resetFocusTimer = () => {
+    if (timerRunning) pauseFocusTimer();
+    const minutes = focusMode === 'work' ? dataRef.current.focus.workMins
+      : focusMode === 'shortBreak' ? dataRef.current.focus.shortMins : dataRef.current.focus.longMins;
+    setRemaining(minutes * 60);
+    updateData((current) => ({
+      ...current,
+      timer: {
+        mode: focusMode,
+        running: false,
+        endsAt: null,
+        remainingSeconds: minutes * 60,
+        sessionStartedAt: null,
+      },
+    }));
   };
 
   const changeAlarmActive = (id: string, active: boolean) => {
     updateData((current) => ({
       ...current,
-      alarms: current.alarms.map((alarm) => alarm.id === id ? { ...alarm, active } : alarm),
+      alarms: current.alarms.map((alarm) => {
+        if (alarm.id !== id) return alarm;
+        if (!active) return { ...alarm, active: false };
+        return reactivateAlarm(alarm);
+      }),
     }));
     void syncNotifications(dataRef.current.alarms, active);
   };
@@ -466,12 +544,12 @@ export function useChronoFlow() {
       return;
     }
     const alarm: Alarm = {
-      id: `${Date.now()}`,
+      id: createId('alarm'),
       time: alarmTime,
       label: alarmLabel.trim(),
       category: alarmCategory,
       challenge: alarmChallenge,
-      days: alarmDays,
+      days: [...alarmDays].sort(),
       active: true,
       ...(alarmDays.length === 0 ? { fireAt: nextTime(alarmTime).getTime() } : {}),
     };
@@ -492,7 +570,7 @@ export function useChronoFlow() {
       return;
     }
     const task: Task = {
-      id: `${Date.now()}`,
+      id: createId('task'),
       title: taskTitle.trim(),
       time: taskTime,
       duration,
@@ -510,15 +588,18 @@ export function useChronoFlow() {
 
   const toggleTask = (id: string) => {
     updateData((current) => {
-      const tasks = current.tasks.map((task) => task.id === id ? { ...task, completed: !task.completed } : task);
+      const tasks = current.tasks.map((task) =>
+        task.id === id ? { ...task, completed: !task.completed } : task);
       const completing = current.tasks.find((task) => task.id === id)?.completed === false;
       if (!completing) return { ...current, tasks };
+
       const today = todayKey();
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
+      const baseStreak = effectiveStreak(current.streak, current.lastStreakDate);
       const streak = current.lastStreakDate === today
-        ? current.streak
-        : current.lastStreakDate === todayKey(yesterday) ? current.streak + 1 : 1;
+        ? Math.max(1, current.streak)
+        : baseStreak + 1;
       return { ...current, tasks, streak, lastStreakDate: today };
     });
   };
@@ -527,7 +608,6 @@ export function useChronoFlow() {
     updateData((current) => ({
       ...current,
       tasks: current.tasks.filter((task) => task.id !== id),
-      focus: { ...current.focus, linkedTaskId: current.focus.linkedTaskId === id ? '' : current.focus.linkedTaskId },
     }));
   };
 
@@ -537,15 +617,28 @@ export function useChronoFlow() {
       Alert.alert('Check timer lengths', 'Each duration must be a whole number between 1 and 120 minutes.');
       return;
     }
-    updateData((current) => ({
-      ...current,
-      focus: { ...current.focus, workMins: values[0], shortMins: values[1], longMins: values[2] },
-    }));
     if (timerRunning) pauseFocusTimer();
-    setModal(null);
+
     const minutes = focusMode === 'work' ? values[0]
       : focusMode === 'shortBreak' ? values[1] : values[2];
+    updateData((current) => ({
+      ...current,
+      focus: {
+        ...current.focus,
+        workMins: values[0],
+        shortMins: values[1],
+        longMins: values[2],
+      },
+      timer: {
+        mode: focusMode,
+        running: false,
+        endsAt: null,
+        remainingSeconds: minutes * 60,
+        sessionStartedAt: null,
+      },
+    }));
     setRemaining(minutes * 60);
+    setModal(null);
   };
 
   const dismissAlarm = () => setRinging(null);
@@ -555,7 +648,7 @@ export function useChronoFlow() {
     const snoozed = new Date(Date.now() + 5 * 60 * 1000);
     const time = `${String(snoozed.getHours()).padStart(2, '0')}:${String(snoozed.getMinutes()).padStart(2, '0')}`;
     const snooze: Alarm = {
-      id: `${Date.now()}`,
+      id: createId('snooze'),
       time,
       label: `Snoozed: ${ringing.label}`,
       category: 'Personal',
@@ -570,7 +663,7 @@ export function useChronoFlow() {
   };
 
   const verifyMath = () => {
-    if (Number(mathInput) === mathQuestion.answer && mathInput.trim()) {
+    if (mathInput.trim() && Number(mathInput) === mathQuestion.answer) {
       dismissAlarm();
     } else {
       setMathError(true);
@@ -584,134 +677,6 @@ export function useChronoFlow() {
       long: `${data.focus.longMins}`,
     });
     setModal('settings');
-  };
-
-  const resetFocusTimer = () => {
-    pauseFocusTimer();
-    const minutes = focusMode === 'work' ? data.focus.workMins
-      : focusMode === 'shortBreak' ? data.focus.shortMins : data.focus.longMins;
-    setRemaining(minutes * 60);
-  };
-
-  const linkFocusTask = (id: string) => {
-    updateData((current) => ({ ...current, focus: { ...current.focus, linkedTaskId: id } }));
-  };
-
-  const activeAlarms = data.alarms.filter((alarm) => alarm.active);
-  const completedCount = data.tasks.filter((task) => task.completed).length;
-  const progress = data.tasks.length ? Math.round((completedCount / data.tasks.length) * 100) : 0;
-  const nextAlarm = activeAlarms
-    .map((alarm) => ({ alarm, date: nextAlarmDate(alarm) }))
-    .filter((item): item is { alarm: Alarm; date: Date } => item.date !== null)
-    .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
-
-  const fetchApps = async () => {
-    setLoadingApps(true);
-    try {
-      const apps = await getInstalledApps();
-      setInstalledApps(apps);
-    } catch (error) {
-      Alert.alert('Could not get apps', String(error));
-    } finally {
-      setLoadingApps(false);
-    }
-  };
-
-  const openAddAppPicker = () => {
-    if (!isNativeBlockingAvailable()) {
-      Alert.alert(
-        'Unavailable in Expo',
-        'Expo managed apps cannot inspect installed apps or block their access. Your focus timer and scheduled reminders work without this feature.',
-      );
-      return;
-    }
-    setModal('appPicker');
-    void fetchApps();
-  };
-
-  const selectAppToBlock = (packageName: string, label: string) => {
-    if (data.blockedApps.some((app) => app.packageName === packageName)) {
-      Alert.alert('Already added', 'This app is already in your block list.');
-      return;
-    }
-    const app: BlockedApp = {
-      packageName,
-      label,
-      dailyLimitMinutes: 60,
-      blockDuringFocus: true,
-      scheduleIds: [],
-    };
-    updateData((current) => ({ ...current, blockedApps: [...current.blockedApps, app] }));
-  };
-
-  const addBlockedApp = () => {
-    if (!newAppPackage.trim() || !newAppLabel.trim()) {
-      Alert.alert('Add an app', 'Enter both the package name and display label.');
-      return;
-    }
-    const app: BlockedApp = {
-      packageName: newAppPackage.trim(),
-      label: newAppLabel.trim(),
-      dailyLimitMinutes: 60,
-      blockDuringFocus: true,
-      scheduleIds: [],
-    };
-    updateData((current) => ({ ...current, blockedApps: [...current.blockedApps, app] }));
-    setNewAppPackage('');
-    setNewAppLabel('');
-    setAddAppModal(false);
-  };
-
-  const removeBlockedApp = (packageName: string) => {
-    updateData((current) => ({
-      ...current,
-      blockedApps: current.blockedApps.filter((app) => app.packageName !== packageName),
-    }));
-  };
-
-  const toggleBlockedApp = (packageName: string, blockDuringFocus: boolean) => {
-    updateData((current) => ({
-      ...current,
-      blockedApps: current.blockedApps.map((app) =>
-        app.packageName === packageName ? { ...app, blockDuringFocus } : app,
-      ),
-    }));
-  };
-
-  const addSchedule = () => {
-    if (!validTime(newScheduleStart) || !validTime(newScheduleEnd)) {
-      Alert.alert('Check times', 'Use a valid 24-hour format, for example 21:00.');
-      return;
-    }
-    if (newScheduleStart === newScheduleEnd) {
-      Alert.alert('Check times', 'The start and end time must be different.');
-      return;
-    }
-    if (newScheduleDays.length === 0) {
-      Alert.alert('Select repeat days', 'Choose at least one day for this schedule.');
-      return;
-    }
-    const schedule: BlockSchedule = {
-      id: `schedule-${Date.now()}`,
-      startTime: newScheduleStart,
-      endTime: newScheduleEnd,
-      days: [...newScheduleDays].sort(),
-      enabled: true,
-    };
-    updateData((current) => ({ ...current, schedules: [...current.schedules, schedule] }));
-    setNewScheduleDays([1, 2, 3, 4, 5]);
-    setModal(null);
-  };
-
-  const removeSchedule = (id: string) => {
-    updateData((current) => ({ ...current, schedules: current.schedules.filter((s) => s.id !== id) }));
-  };
-
-  const toggleSchedule = (id: string, enabled: boolean) => {
-    updateData((current) => ({
-      ...current,
-      schedules: current.schedules.map((s) => (s.id === id ? { ...s, enabled } : s)),
-    }));
   };
 
   const toggleNotifications = (enabled: boolean) => {
@@ -729,17 +694,20 @@ export function useChronoFlow() {
   };
 
   const setBackgroundImage = (uri: string) => {
+    const previous = dataRef.current.backgroundImage;
     updateData((current) => ({ ...current, backgroundImage: uri }));
+    if (previous && previous !== uri) void removeBackgroundImage(previous);
   };
+
   const clearAllData = () => {
     const next = defaultData();
     setTimerRunning(false);
     setTimerEndAt(null);
     setRemaining(next.focus.workMins * 60);
     setFocusMode('work');
-    clearNativeBlockState();
-    setIsBlocking(false);
+    focusSessionStartedAtRef.current = null;
     void cancelTimerNotification();
+    void removeBackgroundImage(dataRef.current.backgroundImage);
     setRinging(null);
     setModal(null);
     lastFiredRef.current = '';
@@ -750,7 +718,7 @@ export function useChronoFlow() {
   const exportData = async () => {
     try {
       await Share.share({
-        title: 'AST Time data',
+        title: `${APP_NAME} data`,
         message: JSON.stringify(dataRef.current, null, 2),
       });
     } catch (error) {
@@ -758,20 +726,70 @@ export function useChronoFlow() {
     }
   };
 
-  const handleOpenPermissions = () => {
-    if (Platform.OS !== 'android') {
-      Alert.alert('Not available', 'App blocking is only available on Android.');
-      return;
-    }
-    if (!isNativeBlockingAvailable()) {
-      Alert.alert(
-        'Unavailable in Expo',
-        'Expo managed apps cannot inspect installed apps or block their access.',
-      );
-      return;
-    }
-    openAccessibilitySettings();
+  const addNote = (title: string, body: string) => {
+    const now = Date.now();
+    const note: Note = {
+      id: createId('note'),
+      title: title.trim().slice(0, 200) || 'Untitled',
+      body: body.trim().slice(0, 20_000),
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      deletedAt: null,
+    };
+    updateData((current) => ({ ...current, notes: [note, ...current.notes] }));
   };
+
+  const updateNote = (id: string, title: string, body: string) => {
+    updateData((current) => ({
+      ...current,
+      notes: current.notes.map((note) => note.id === id
+        ? {
+          ...note,
+          title: title.trim().slice(0, 200) || 'Untitled',
+          body: body.trim().slice(0, 20_000),
+          updatedAt: Date.now(),
+        }
+        : note),
+    }));
+  };
+
+  const deleteNote = (id: string) => {
+    updateData((current) => ({
+      ...current,
+      notes: current.notes.map((note) => note.id === id
+        ? { ...note, deletedAt: Date.now() }
+        : note),
+    }));
+  };
+
+  const restoreNote = (id: string) => {
+    updateData((current) => ({
+      ...current,
+      notes: current.notes.map((note) => note.id === id
+        ? { ...note, deletedAt: null }
+        : note),
+    }));
+  };
+
+  const purgeNote = (id: string) => {
+    updateData((current) => ({
+      ...current,
+      notes: current.notes.filter((note) => note.id !== id),
+    }));
+  };
+
+  const toggleNotePin = (id: string) => {
+    updateData((current) => ({
+      ...current,
+      notes: current.notes.map((note) => note.id === id
+        ? { ...note, pinned: !note.pinned, updatedAt: Date.now() }
+        : note),
+    }));
+  };
+
+  const completedCount = data.tasks.filter((task) => task.completed).length;
+  const progress = data.tasks.length ? Math.round((completedCount / data.tasks.length) * 100) : 0;
 
   return {
     data,
@@ -812,14 +830,8 @@ export function useChronoFlow() {
     focusMode,
     remaining,
     timerRunning,
-    isBlocking,
-    accessibilityEnabled,
-    installedApps,
-    loadingApps,
-    activeAlarms,
     completedCount,
     progress,
-    nextAlarm,
     addAlarm,
     addTask,
     changeAlarmActive,
@@ -833,40 +845,22 @@ export function useChronoFlow() {
     startQuickFocus,
     resetFocusTimer,
     openTimerSettings,
-    linkFocusTask,
     resetAlarmForm,
     resetTaskForm,
     dismissAlarm,
     snoozeAlarm,
     verifyMath,
-    openAddAppPicker,
-    selectAppToBlock,
-    addBlockedApp,
-    removeBlockedApp,
-    toggleBlockedApp,
-    addSchedule,
-    removeSchedule,
-    toggleSchedule,
     toggleNotifications,
     setTheme,
     setTimeFormat,
     setBackgroundImage,
     clearAllData,
     exportData,
-    openPermissions: handleOpenPermissions,
-    openAddAppModal: () => setAddAppModal(true),
-    openAddScheduleModal: () => setModal('schedule'),
-    addAppModal,
-    addScheduleModal,
-    newAppPackage,
-    setNewAppPackage,
-    newAppLabel,
-    setNewAppLabel,
-    newScheduleStart,
-    setNewScheduleStart,
-    newScheduleEnd,
-    setNewScheduleEnd,
-    newScheduleDays,
-    setNewScheduleDays,
+    addNote,
+    updateNote,
+    deleteNote,
+    restoreNote,
+    purgeNote,
+    toggleNotePin,
   };
 }

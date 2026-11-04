@@ -1,254 +1,36 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { defaultData, nextTime, STORAGE_KEY, todayKey, validTime } from './constants';
-import type {
-  Alarm,
-  AppData,
-  BlockSchedule,
-  BlockedApp,
-  Category,
-  FocusMode,
-  FocusSession,
-  Priority,
-  Task,
-} from './types';
+import { defaultData, STORAGE_KEY, todayKey } from './constants';
+import { parseAppData } from './dataValidation';
+import type { AppData } from './types';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const BACKUP_KEY_PREFIX = 'asttime-unreadable-';
 
-const isCategory = (value: unknown): value is Category =>
-  value === 'Work' || value === 'Study' || value === 'Exercise' || value === 'Rest';
-
-const isPriority = (value: unknown): value is Priority =>
-  value === 'High' || value === 'Medium' || value === 'Low';
-
-const isFocusMode = (value: unknown): value is FocusMode =>
-  value === 'work' || value === 'shortBreak' || value === 'longBreak';
-
-function parseAlarm(value: unknown, now: number): Alarm | null {
-  if (!isRecord(value)
-    || typeof value.id !== 'string'
-    || typeof value.time !== 'string'
-    || !validTime(value.time)
-    || typeof value.label !== 'string'
-    || typeof value.active !== 'boolean') {
-    return null;
+async function keepRecoveryCopy(raw: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(`${BACKUP_KEY_PREFIX}${Date.now()}`, raw);
+  } catch {
+    // Best effort only: the original read failure is the error worth reporting.
   }
-
-  const category = value.category === 'Personal' || isCategory(value.category)
-    ? value.category
-    : null;
-  if (!category) return null;
-
-  const days = Array.isArray(value.days)
-    ? [...new Set(value.days.filter(
-      (day): day is number => Number.isInteger(day) && day >= 0 && day <= 6,
-    ))].sort()
-    : [];
-  const challenge = value.challenge === 'math' ? 'math' : 'none';
-  const fireAt = typeof value.fireAt === 'number' && Number.isFinite(value.fireAt)
-    ? value.fireAt
-    : days.length === 0 ? nextTime(value.time).getTime() : undefined;
-  const expired = days.length === 0 && fireAt !== undefined && fireAt <= now;
-
-  return {
-    id: value.id,
-    time: value.time,
-    label: value.label,
-    category,
-    challenge,
-    days,
-    active: value.active && !expired,
-    ...(fireAt === undefined ? {} : { fireAt }),
-  };
-}
-
-function parseTask(value: unknown): Task | null {
-  if (!isRecord(value)
-    || typeof value.id !== 'string'
-    || typeof value.title !== 'string'
-    || typeof value.time !== 'string'
-    || !validTime(value.time)
-    || typeof value.duration !== 'number'
-    || !Number.isInteger(value.duration)
-    || value.duration < 5
-    || value.duration > 480
-    || !isPriority(value.priority)
-    || !isCategory(value.category)
-    || typeof value.completed !== 'boolean') {
-    return null;
-  }
-
-  return {
-    id: value.id,
-    title: value.title,
-    time: value.time,
-    duration: value.duration,
-    priority: value.priority,
-    category: value.category,
-    completed: value.completed,
-  };
-}
-
-function parseBlockedApp(value: unknown): BlockedApp | null {
-  if (!isRecord(value)
-    || typeof value.packageName !== 'string'
-    || value.packageName.length === 0
-    || typeof value.label !== 'string'
-    || typeof value.dailyLimitMinutes !== 'number'
-    || !Number.isInteger(value.dailyLimitMinutes)
-    || value.dailyLimitMinutes < 0
-    || typeof value.blockDuringFocus !== 'boolean') {
-    return null;
-  }
-
-  const scheduleIds = Array.isArray(value.scheduleIds)
-    ? value.scheduleIds.filter((id): id is string => typeof id === 'string')
-    : [];
-
-  return {
-    packageName: value.packageName,
-    label: value.label,
-    dailyLimitMinutes: value.dailyLimitMinutes,
-    blockDuringFocus: value.blockDuringFocus,
-    scheduleIds,
-  };
-}
-
-function parseSchedule(value: unknown): BlockSchedule | null {
-  if (!isRecord(value)
-    || typeof value.id !== 'string'
-    || typeof value.startTime !== 'string'
-    || typeof value.endTime !== 'string'
-    || !validTime(value.startTime)
-    || !validTime(value.endTime)
-    || typeof value.enabled !== 'boolean') {
-    return null;
-  }
-
-  const days = Array.isArray(value.days)
-    ? [...new Set(value.days.filter(
-      (day): day is number => Number.isInteger(day) && day >= 0 && day <= 6,
-    ))].sort()
-    : [];
-
-  return {
-    id: value.id,
-    startTime: value.startTime,
-    endTime: value.endTime,
-    days,
-    enabled: value.enabled,
-  };
-}
-
-function parseFocusSession(value: unknown): FocusSession | null {
-  if (!isRecord(value)
-    || typeof value.id !== 'string'
-    || typeof value.startedAt !== 'number'
-    || !Number.isFinite(value.startedAt)
-    || (value.endedAt !== null && (typeof value.endedAt !== 'number' || !Number.isFinite(value.endedAt)))
-    || typeof value.duration !== 'number'
-    || !Number.isFinite(value.duration)
-    || value.duration < 0
-    || !isFocusMode(value.mode)
-    || typeof value.completed !== 'boolean') {
-    return null;
-  }
-
-  const blockedApps = Array.isArray(value.blockedApps)
-    ? value.blockedApps.filter((packageName): packageName is string => typeof packageName === 'string')
-    : [];
-
-  return {
-    id: value.id,
-    startedAt: value.startedAt,
-    endedAt: value.endedAt,
-    duration: value.duration,
-    mode: value.mode,
-    blockedApps,
-    completed: value.completed,
-  };
-}
-
-function parseMinutes(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 120
-    ? value
-    : fallback;
-}
-
-export function parseAppData(value: unknown): AppData {
-  const defaults = defaultData();
-  if (!isRecord(value)) {
-    throw new Error('Saved AST Time data has an invalid format.');
-  }
-
-  const tasks = Array.isArray(value.tasks)
-    ? value.tasks.map(parseTask).filter((task): task is Task => task !== null)
-    : defaults.tasks;
-  const alarms = Array.isArray(value.alarms)
-    ? value.alarms.map((alarm) => parseAlarm(alarm, Date.now()))
-      .filter((alarm): alarm is Alarm => alarm !== null)
-    : defaults.alarms;
-  const blockedApps = Array.isArray(value.blockedApps)
-    ? value.blockedApps.map(parseBlockedApp).filter((app): app is BlockedApp => app !== null)
-    : defaults.blockedApps;
-  const schedules = Array.isArray(value.schedules)
-    ? value.schedules.map(parseSchedule).filter((schedule): schedule is BlockSchedule => schedule !== null)
-    : defaults.schedules;
-  const focusSessions = Array.isArray(value.focusSessions)
-    ? value.focusSessions.map(parseFocusSession).filter((session): session is FocusSession => session !== null)
-    : defaults.focusSessions;
-
-  const focus = isRecord(value.focus) ? value.focus : {};
-  const linkedTaskId = typeof focus.linkedTaskId === 'string' ? focus.linkedTaskId : '';
-  const focusDate = typeof focus.focusDate === 'string' ? focus.focusDate : defaults.focus.focusDate;
-  const dailyGoal = typeof focus.dailyGoal === 'number'
-    && Number.isInteger(focus.dailyGoal) && focus.dailyGoal >= 0
-    ? focus.dailyGoal
-    : defaults.focus.dailyGoal;
-
-  return {
-    alarms,
-    tasks,
-    blockedApps,
-    schedules,
-    focusSessions,
-    focus: {
-      workMins: parseMinutes(focus.workMins, defaults.focus.workMins),
-      shortMins: parseMinutes(focus.shortMins, defaults.focus.shortMins),
-      longMins: parseMinutes(focus.longMins, defaults.focus.longMins),
-      totalFocusMinsToday: typeof focus.totalFocusMinsToday === 'number'
-        && Number.isFinite(focus.totalFocusMinsToday)
-        && focus.totalFocusMinsToday >= 0
-        ? focus.totalFocusMinsToday
-        : defaults.focus.totalFocusMinsToday,
-      focusDate,
-      linkedTaskId: tasks.some((task) => task.id === linkedTaskId) ? linkedTaskId : '',
-      dailyGoal,
-    },
-    streak: typeof value.streak === 'number' && Number.isInteger(value.streak) && value.streak >= 0
-      ? value.streak
-      : defaults.streak,
-    lastStreakDate: typeof value.lastStreakDate === 'string' ? value.lastStreakDate : '',
-    theme: value.theme === 'light' || value.theme === 'dark' || value.theme === 'system'
-      ? value.theme
-      : defaults.theme,
-    timeFormat: value.timeFormat === '24h' || value.timeFormat === '12h'
-      ? value.timeFormat
-      : defaults.timeFormat,
-    notificationsEnabled: typeof value.notificationsEnabled !== 'boolean'
-      ? defaults.notificationsEnabled
-      : value.notificationsEnabled,
-  };
 }
 
 export async function loadAppData(): Promise<AppData> {
   const stored = await AsyncStorage.getItem(STORAGE_KEY);
   if (stored === null) return defaultData();
 
-  const data = parseAppData(JSON.parse(stored) as unknown);
-  if (data.focus.focusDate !== todayKey()) {
-    data.focus.focusDate = todayKey();
-    data.focus.totalFocusMinsToday = 0;
+  let data: AppData;
+  try {
+    data = parseAppData(JSON.parse(stored) as unknown);
+  } catch (error) {
+    await keepRecoveryCopy(stored);
+    throw error;
+  }
+
+  const today = todayKey();
+  if (data.focus.focusDate !== today) {
+    return {
+      ...data,
+      focus: { ...data.focus, focusDate: today, totalFocusMinsToday: 0 },
+    };
   }
   return data;
 }
@@ -256,3 +38,5 @@ export async function loadAppData(): Promise<AppData> {
 export async function saveAppData(data: AppData): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
+
+export { parseAppData };

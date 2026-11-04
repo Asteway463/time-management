@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Card, Metric, ProgressBar, ScreenHeading } from '../components/Common';
 import { AppIcon } from '../components/AppIcon';
@@ -14,10 +14,11 @@ type Props = {
 export function StatsScreen({ data, sessions }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
+  const [now] = useState(() => Date.now());
   const completedSessions = sessions.filter((s) => s.completed).length;
   const totalMinutes = sessions.reduce((sum, s) => sum + s.duration, 0);
   const thisWeekMinutes = sessions
-    .filter((s) => s.startedAt > Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .filter((s) => s.startedAt > now - 7 * 24 * 60 * 60 * 1000)
     .reduce((sum, s) => sum + s.duration, 0);
 
   const goalProgress = data.focus.dailyGoal > 0

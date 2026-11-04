@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BlurView } from 'expo-blur';
 import {
   Animated,
   Pressable,
@@ -10,12 +11,44 @@ import {
 } from 'react-native';
 import { AppIcon } from './AppIcon';
 import { formatTime } from '../constants';
-import type { Alarm, Task, TimeFormat } from '../types';
-import { LINE_HEIGHT, RADII, SHADOWS, SPACE, TRACKING, TYPE, useThemedStyles, type ThemeColors } from '../theme';
+import type { Task, TimeFormat } from '../types';
+import { LINE_HEIGHT, LIGHT_COLORS, RADII, SHADOWS, SPACE, TYPE, useBlurTarget, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
+
+const GLASS_INTENSITY = 34;
+
+/**
+ * Translucent, blurred surface used for cards. Android uses the dimezis
+ * implementation so the effect works on Android 10+; older devices that cannot
+ * render it still get the translucent background colour.
+ */
+function GlassSurface({
+  children,
+  style,
+  intensity = GLASS_INTENSITY,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  intensity?: number;
+}) {
+  const colors = useThemeColors();
+  const blurTarget = useBlurTarget();
+  const tint = colors.background === LIGHT_COLORS.background ? 'light' : 'dark';
+  return (
+    <BlurView
+      intensity={intensity}
+      tint={tint}
+      blurMethod="dimezisBlurView"
+      blurTarget={blurTarget ?? undefined}
+      style={style}
+    >
+      {children}
+    </BlurView>
+  );
+}
 
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const styles = useStyles();
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <GlassSurface style={[styles.card, style]}>{children}</GlassSurface>;
 }
 
 export function ScreenHeading({
@@ -42,10 +75,10 @@ export function ScreenHeading({
 export function Metric({ label, value, color }: { label: string; value: string; color: string }) {
   const styles = useStyles();
   return (
-    <View style={styles.metric}>
+    <GlassSurface style={styles.metric} intensity={28}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]} numberOfLines={1}>{value}</Text>
-    </View>
+    </GlassSurface>
   );
 }
 
@@ -72,7 +105,7 @@ export function LiveClock({ timeFormat = '24h' }: { timeFormat?: TimeFormat }) {
   const styles = useStyles();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 30_000);
+    const interval = setInterval(() => setNow(new Date()), 15_000);
     return () => clearInterval(interval);
   }, []);
   return (
@@ -122,20 +155,6 @@ export function Button({
 export function EmptyCard({ text }: { text: string }) {
   const styles = useStyles();
   return <Card><Text style={styles.emptyText}>{text}</Text></Card>;
-}
-
-export function AlarmSummary({ alarm, timeFormat = '24h' }: { alarm: Alarm; timeFormat?: TimeFormat }) {
-  const styles = useStyles();
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryTime}>{formatTime(alarm.time, timeFormat)}</Text>
-      <View style={styles.flex}>
-        <Text style={styles.cardText} numberOfLines={1}>{alarm.label}</Text>
-        <Text style={styles.smallMuted}>{alarm.category}</Text>
-      </View>
-      <Text style={styles.activeLabel}>ACTIVE</Text>
-    </View>
-  );
 }
 
 export function TaskRow({
@@ -257,11 +276,12 @@ function useStyles() {
 const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   card: {
     padding: SPACE.lg,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceGlass,
     borderRadius: RADII.xl,
     borderWidth: 1,
     borderColor: COLORS.border,
     gap: SPACE.md,
+    overflow: 'hidden',
     ...SHADOWS.card,
   },
   progressTrack: { width: '100%', height: 9, borderRadius: RADII.pill, backgroundColor: COLORS.surfaceRaised, overflow: 'hidden', marginTop: SPACE.sm },
@@ -275,10 +295,11 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     flexGrow: 1,
     minHeight: 78,
     padding: SPACE.md,
-    backgroundColor: COLORS.surfaceInset,
+    backgroundColor: COLORS.surfaceGlass,
     borderRadius: RADII.md,
     borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: 'hidden',
     justifyContent: 'center',
   },
   metricLabel: { color: COLORS.muted, fontSize: TYPE.caption, fontWeight: '600' },
@@ -296,24 +317,13 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     gap: SPACE.xs,
   },
   buttonSecondary: { backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border },
-  buttonDanger: { backgroundColor: COLORS.red },
-  buttonSmall: { minHeight: 42, paddingHorizontal: SPACE.md },
+  buttonDanger: { backgroundColor: COLORS.danger },
+  buttonSmall: { minHeight: 44, paddingHorizontal: SPACE.md },
   buttonText: { color: COLORS.white, fontWeight: '700', fontSize: TYPE.body },
   buttonTextSecondary: { color: COLORS.textSecondary },
   pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
   emptyText: { color: COLORS.muted, textAlign: 'center', paddingVertical: SPACE.md, fontSize: TYPE.body, lineHeight: 21 },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACE.md,
-    padding: SPACE.md,
-    borderRadius: RADII.md,
-    backgroundColor: COLORS.surfaceRaised,
-  },
-  summaryTime: { color: COLORS.text, fontSize: TYPE.bodyLarge, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  cardText: { color: COLORS.textSecondary, fontSize: TYPE.body, fontWeight: '600' },
   smallMuted: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs },
-  activeLabel: { color: COLORS.green, fontSize: TYPE.micro, fontWeight: '800', letterSpacing: TRACKING.badge },
   flex: { flex: 1 },
   taskRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, minHeight: 48 },
   checkbox: {

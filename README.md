@@ -1,8 +1,20 @@
-# ChronoFlow
+# Atna's Flow
 
-ChronoFlow is an Expo managed time-management app. It includes a daily dashboard, task planner, focus timer, and local alarm reminders.
+Atna's Flow is an Expo managed time-management app. It includes a daily dashboard, task planner, focus timer, notebook, statistics, and local alarm reminders.
 
-The app targets Expo SDK 58, React Native 0.88.0, and React 19.3.0. `src/theme.ts` is the shared source for colors, spacing, typography, radii, layout sizes, and elevation.
+The app targets Expo SDK 58, React Native 0.88.1, and React 19.3.0. `src/theme.ts` is the shared source for colors, spacing, typography, radii, layout sizes, and elevation.
+
+## Features
+
+- Tasks with categories, priorities, durations, and completion tracking.
+- Focus timer with work, short-break, and long-break modes. The timer end time is persisted so a running session survives Android killing the app process.
+- Local alarm notifications with one-time and weekly schedules, snooze, and an optional math dismiss challenge.
+- Notebook with pinning, search, editing, soft-delete trash, restore, and permanent delete.
+- Light, dark, and automatic appearance; 12-hour and 24-hour display.
+- Background image picker that copies the chosen image into app storage.
+- JSON data export through the Android share sheet.
+
+All data stays on the device. There are no accounts and no network calls at runtime.
 
 ## Run locally
 
@@ -13,9 +25,7 @@ npm ci
 npm run dev
 ```
 
-The start scripts select Expo Go and use your local network. Connect your phone and computer to the same Wi-Fi, then open Expo Go and scan the QR code from Expo Go's scanner; scanning with the phone camera may open a web page instead. If Expo Go reports an SDK mismatch, update Expo Go and restart the server to generate a new QR code. For a browser preview, run `npx expo start --web`; web dependencies are already installed.
-
-Expo Go may not include the Android-only `ExpoTopicSubscriptionModule`. `expo-notifications` 58.1.7 loads that module optionally, so local alarms work without it; remote topic subscriptions remain unavailable when the native module is absent. After installing or updating dependencies, restart Metro with `npx expo start --clear`.
+The start scripts select Expo Go and use your local network. Connect your phone and computer to the same Wi-Fi, then open Expo Go and scan the QR code. If Expo Go reports an SDK mismatch, update Expo Go and restart the server. For a browser preview, run `npm run web`.
 
 ## Run with Docker
 
@@ -25,37 +35,51 @@ Docker Engine and Docker Compose are required. Start the Expo Go development ser
 docker compose up --build dev
 ```
 
-The development server uses the `@expo/ngrok` tunnel, so it can connect across different Wi-Fi networks without requiring an Expo account login. Scan its QR code from inside Expo Go and keep the container running. To run the static web export instead, use:
+The development server uses the `@expo/ngrok` tunnel, so it can connect across different Wi-Fi networks. To run the static web export instead:
 
 ```sh
 docker compose up --build web
 ```
 
-The web preview is available at `http://localhost:8080` (or the port set by `PORT`). `docker compose build` builds both images. If Docker reports permission denied for `/var/run/docker.sock`, run the command with `sudo` or ask the system administrator to grant Docker access; membership in the `docker` group gives root-equivalent privileges.
+The web preview is available at `http://localhost:8080` (or the port set by `PORT`).
 
-Tasks, alarms, and timer settings are stored on the device. Alarm notifications require notification permission. As with other scheduled notifications, delivery and sound can be affected by device focus, battery, and operating-system settings; this app does not yet provide a guaranteed full-screen system-clock alarm.
+## Release builds
 
-Settings include dark, light, and automatic appearance (which follows the device), plus 12-hour AM/PM or 24-hour time display. Time entry fields accept 24-hour values; display preferences are saved on the device.
+Android release builds run on EAS Build:
 
-## Expo limitations
+```sh
+npx eas-cli build --platform android --profile preview     # signed APK for direct install
+npx eas-cli build --platform android --profile production  # signed AAB for Google Play
+```
 
-App blocking is not available in this Expo managed app because Expo Go does not provide APIs to inspect or block other installed apps. The existing saved app lists and schedules are retained for data compatibility. Tasks, alarms, and focus sessions continue to work with Expo modules.
+The `preview` profile produces an APK. The `production` profile produces an app bundle and increments the remote Android version code. Signing credentials are stored by EAS, not in this repository.
 
 ## Verify the project
 
 ```sh
+npm run verify        # typecheck + ESLint + unit tests
+npm run doctor        # expo-doctor
+npm run export        # JS bundle for Android
 npx expo install --check
-npx expo-doctor
-npm run typecheck
-npx expo export --platform all
 ```
+
+Unit tests run with `tsx --test` and cover time formatting, persisted-data parsing, timer recovery, streak logic, and alarm reactivation.
+
+## Notes on Android alarms
+
+Alarm notifications require notification permission, and exact alarms may require the user to allow "Alarms & reminders" in Android settings. Battery optimisation and Do Not Disturb can delay delivery, so keep Atna's Flow unrestricted in Android settings if punctuality matters. Delivery is not a guaranteed full-screen system-clock alarm.
 
 ## Component layout
 
 - `App.tsx` composes the app shell, navigation, screens, and dialogs.
-- `src/screens/` contains the home, alarm manager, focus timer, app blocking, statistics, and settings screens.
+- `src/screens/` contains the home, planner, focus timer, alarms, statistics, notebook, and settings screens.
 - `src/components/Common.tsx` contains reusable cards, buttons, headings, choice controls, and task rows.
 - `src/components/Dialogs.tsx` contains form and ringing-alarm dialogs.
+- `src/components/ErrorBoundary.tsx` shows a recovery screen if rendering fails.
 - `src/theme.ts` defines shared design tokens used by all screens and components.
 - `src/useChronoFlow.ts` owns app state, persistence, alarm scheduling, and timer behavior.
+- `src/logic.ts` and `src/dataValidation.ts` contain the tested pure logic and saved-data parsing.
+- `src/storage.ts` handles AsyncStorage persistence and keeps a recovery copy of unreadable data.
+- `src/notifications.ts` handles Android notification channels and alarm scheduling.
+- `src/services/backgroundImage.ts` copies picked images into durable app storage.
 - `src/types.ts` and `src/constants.ts` define shared models and values.

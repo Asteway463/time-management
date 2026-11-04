@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { formatTime, nextTime, validTime } from './constants';
+import { APP_NAME, formatTime, nextTime, validTime } from './constants';
 import type { Alarm, TimeFormat } from './types';
 
 export const ALARM_CHANNEL_ID = 'chronoflow-alarms-v2';
@@ -14,7 +14,7 @@ export async function ensureAlarmChannelAsync(): Promise<void> {
   if (Platform.OS !== 'android') return;
   if (!channelSetup) {
     channelSetup = Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
-      name: 'ChronoFlow alarms',
+      name: `${APP_NAME} alarms`,
       description: 'Alarm and focus timer reminders',
       importance: Notifications.AndroidImportance.MAX,
       sound: 'default',
@@ -102,7 +102,7 @@ async function synchronizeAlarmNotificationsAsync(
   try {
     for (const alarm of activeAlarms) {
       const content: Notifications.NotificationContentInput = {
-        title: alarm.label || 'ChronoFlow alarm',
+        title: alarm.label || `${APP_NAME} alarm`,
         body: `${alarm.category} alarm · ${formatTime(alarm.time, timeFormat)}`,
         sound: 'default',
         data: { alarmId: alarm.id },
