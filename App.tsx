@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, Animated, Easing, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from './src/components/AppIcon';
 import { LiveClock } from './src/components/Common';
@@ -17,6 +18,7 @@ import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BlockingScreen } from './src/screens/BlockingScreen';
 import { FocusScreen } from './src/screens/FocusScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { NotebookScreen } from './src/screens/NotebookScreen';
 import { PlannerScreen } from './src/screens/PlannerScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
@@ -44,29 +46,52 @@ export default function App() {
     }).start();
   }, [flow.tab, activityProgress]);
 
+  const logoScale = useRef(new Animated.Value(0.6)).current;
+  const logoRotate = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslate = useRef(new Animated.Value(20)).current;
+  const bgAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, friction: 4 }),
+      Animated.timing(logoRotate, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(bgAnim, { toValue: 1, duration: 1200, useNativeDriver: false }),
+    ]).start(() => {
+      Animated.parallel([
+        Animated.timing(textOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(textTranslate, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ]).start();
+    });
+  }, [logoScale, logoRotate, bgAnim, textOpacity, textTranslate]);
+  const bgColor = bgAnim.interpolate({ inputRange: [0, 1], outputRange: ['#0B0F19', '#1a1040'] });
   if (!flow.loaded) {
     return (
-      <SafeAreaView style={[styles.loading, { backgroundColor: colors.background }]}>
+      <Animated.View style={[styles.loading, { backgroundColor: bgColor, flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar style={colors === LIGHT_COLORS ? 'dark' : 'light'} />
-        <Text style={styles.brandTitle}>AST Time</Text>
-        <Text style={styles.muted}>Getting your day in order…</Text>
-      </SafeAreaView>
+        <Animated.View style={{ transform: [{ scale: logoScale }, { rotate: logoRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+          <Image source={require('./assets/icon.png')} style={{ width: 96, height: 96, borderRadius: 24 }} />
+        </Animated.View>
+        <Animated.Text style={[styles.brandTitle, { opacity: textOpacity, transform: [{ translateY: textTranslate }] }]}>ATNA Timmer</Animated.Text>
+        <Animated.Text style={{ color: colors.muted, fontSize: 12, marginTop: 4, opacity: textOpacity }}>Build with Asteway</Animated.Text>
+        <Animated.Text style={[styles.muted, { opacity: textOpacity }]}>Getting your day in order…</Animated.Text>
+      </Animated.View>
     );
   }
 
   return (
     <ThemeColorsContext.Provider value={colors}>
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <ImageBackground source={flow.data.backgroundImage ? { uri: flow.data.backgroundImage } : require('./assets/background.jpg')} style={{ flex: 1 }} imageStyle={{ opacity: 1 }}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
       <StatusBar style={colors === LIGHT_COLORS ? 'dark' : 'light'} />
       <View style={styles.header}>
         <View style={styles.brandRow}>
-          <View style={styles.brandIcon}><AppIcon name="clock" size={26} color={colors.white} strokeWidth={1.9} /></View>
+          <View style={styles.brandIcon}><Image source={require('./assets/icon.png')} style={{ width: 26, height: 26, borderRadius: 6 }} /></View>
           <View>
-            <Text style={styles.brandTitle}>AST Time</Text>
+            <Text style={styles.brandTitle}>ATNA Timmer</Text>
             <Text style={styles.headerSubtitle}>Make time for what matters</Text>
           </View>
         </View>
-        <View style={styles.clockBox}><LiveClock timeFormat={flow.data.timeFormat} /></View>
+        <View style={styles.clockBox}><LiveClock timeFormat={flow.data.timeFormat} /><Pressable onPress={() => Alert.alert('Version', 'ChronoFlow v1.0.0 — up to date')} style={{ marginTop: 4 }}><Text style={{ color: colors.muted, fontSize: 10 }}>Update</Text></Pressable></View>
       </View>
 
       <View style={styles.tabsViewport}>
@@ -170,12 +195,16 @@ export default function App() {
             sessions={flow.data.focusSessions}
           />
         )}
+        {flow.tab === 'notebook' && (
+          <NotebookScreen data={flow.data} />
+        )}
         {flow.tab === 'settings' && (
           <SettingsScreen
             data={flow.data}
             onToggleNotifications={flow.toggleNotifications}
             onSetTheme={flow.setTheme}
             onSetTimeFormat={flow.setTimeFormat}
+            onSetBackgroundImage={flow.setBackgroundImage}
             onClearData={flow.clearAllData}
             onExportData={flow.exportData}
           />
@@ -256,6 +285,7 @@ export default function App() {
         timeFormat={flow.data.timeFormat}
       />
     </SafeAreaView>
+    </ImageBackground>
     </ThemeColorsContext.Provider>
   );
 }
@@ -276,7 +306,7 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
     gap: SPACE.md,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, flexShrink: 1 },
-  brandIcon: { width: 44, height: 44, borderRadius: RADII.md, backgroundColor: COLORS.primaryStrong, alignItems: 'center', justifyContent: 'center' },
+  brandIcon: { width: 52, height: 52, borderRadius: RADII.md, alignItems: 'center', justifyContent: 'center' },
   brandTitle: { fontSize: TYPE.headingSmall, fontWeight: '800', color: COLORS.text, letterSpacing: TRACKING.subtle },
   headerSubtitle: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs / 2 },
   clockBox: { alignItems: 'flex-end' },

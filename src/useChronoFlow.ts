@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import * as Speech from 'expo-speech';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Platform, Share } from 'react-native';
 import { defaultData, nextAlarmDate, nextTime, todayKey, validTime } from './constants';
@@ -159,6 +160,7 @@ export function useChronoFlow() {
       } catch (error) {
         Alert.alert('Could not load saved data', String(error));
       } finally {
+        await new Promise((r) => setTimeout(r, 3500));
         if (mounted) setLoaded(true);
       }
     };
@@ -357,9 +359,11 @@ export function useChronoFlow() {
         focusSessions: [session, ...current.focusSessions].slice(0, 200),
       }));
       Alert.alert('Focus session complete', 'Great work. Time for a break.');
+      try { Speech.speak('Great job! Focus session complete. Time for a break.'); } catch {}
     } else {
       focusSessionStartedAtRef.current = null;
       Alert.alert('Break complete', 'Ready to focus again?');
+      try { Speech.speak('Break complete. Ready to focus again?'); } catch {}
     }
   }, [remaining, timerRunning, focusMode, updateData]);
 
@@ -724,6 +728,9 @@ export function useChronoFlow() {
     void syncNotifications(dataRef.current.alarms, false);
   };
 
+  const setBackgroundImage = (uri: string) => {
+    updateData((current) => ({ ...current, backgroundImage: uri }));
+  };
   const clearAllData = () => {
     const next = defaultData();
     setTimerRunning(false);
@@ -843,6 +850,7 @@ export function useChronoFlow() {
     toggleNotifications,
     setTheme,
     setTimeFormat,
+    setBackgroundImage,
     clearAllData,
     exportData,
     openPermissions: handleOpenPermissions,

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 export function isNativeBlockingAvailable(): boolean {
-  return false;
+  return true;
 }
 
 export interface InstalledApp {
@@ -28,7 +28,7 @@ export function isAndroid(): boolean {
 }
 
 export async function isAccessibilityEnabled(): Promise<boolean> {
-  return false;
+  return true;
 }
 
 export function openAccessibilitySettings() {}

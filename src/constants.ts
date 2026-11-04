@@ -13,6 +13,7 @@ export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
   { id: 'alarms', label: 'Alarms', icon: 'alarm' },
   { id: 'blocking', label: 'Blocking', icon: 'blocking' },
   { id: 'stats', label: 'Stats', icon: 'stats' },
+  { id: 'notebook', label: 'Notebook', icon: 'app' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -39,6 +40,8 @@ export const defaultData = (): AppData => ({
   theme: 'system',
   timeFormat: '12h',
   notificationsEnabled: true,
+  backgroundColor: '#0B0F19',
+  backgroundImage: '',
 });
 
 export const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);

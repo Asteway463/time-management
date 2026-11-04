@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'planner' | 'focus' | 'alarms' | 'blocking' | 'stats' | 'settings';
+export type Tab = 'home' | 'planner' | 'focus' | 'alarms' | 'blocking' | 'stats' | 'notebook' | 'settings';
 export type Category = 'Work' | 'Study' | 'Exercise' | 'Rest';
 export type Priority = 'High' | 'Medium' | 'Low';
 export type FocusMode = 'work' | 'shortBreak' | 'longBreak';
@@ -66,4 +66,6 @@ export type AppData = {
   theme: 'light' | 'dark' | 'system';
   timeFormat: TimeFormat;
   notificationsEnabled: boolean;
+  backgroundColor?: string;
+  backgroundImage?: string;
 };

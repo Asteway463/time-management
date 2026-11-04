@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, ScreenHeading } from '../components/Common';
+import * as ImagePicker from 'expo-image-picker';
 import { LAYOUT, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { AppData, TimeFormat } from '../types';
 
@@ -9,11 +10,12 @@ type Props = {
   onToggleNotifications: (enabled: boolean) => void;
   onSetTheme: (theme: 'light' | 'dark' | 'system') => void;
   onSetTimeFormat: (format: TimeFormat) => void;
+  onSetBackgroundImage: (uri: string) => void;
   onClearData: () => void;
   onExportData: () => void;
 };
 
-export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onClearData, onExportData }: Props) {
+export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onSetBackgroundImage, onClearData, onExportData }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
   const handleClearData = () => {
@@ -109,6 +111,13 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
       </Card>
 
       <Card>
+        <Text style={styles.sectionTitle}>Background image</Text>
+        <Button title="Choose background image" onPress={async () => {
+          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+          if (!res.canceled && res.assets?.[0]?.uri) onSetBackgroundImage(res.assets[0].uri);
+        }} variant="secondary" />
+        {data.backgroundImage ? <Button title="Remove background image" onPress={() => onSetBackgroundImage('')} variant="danger" /> : null}
+
         <Text style={styles.sectionTitle}>Data</Text>
         <Button title="Export data" onPress={onExportData} variant="secondary" />
         <Button title="Clear all data" onPress={handleClearData} variant="danger" />
@@ -116,8 +125,8 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
 
       <Card>
         <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.aboutText}>AST Time v1.0.0</Text>
-        <Text style={styles.aboutMeta}>Built with Expo SDK 58 · React Native 0.88</Text>
+        <Text style={styles.aboutText}>ATNA Timmer v1.0.0</Text>
+        <Text style={styles.aboutMeta}>Built with Asteway Teshome · Expo SDK 58 · React Native 0.88</Text>
       </Card>
     </View>
   );
