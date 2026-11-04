@@ -1,0 +1,2 @@
+int string focus_blocker_accessibility_description 0x0
+int xml focus_blocker_accessibility 0x0

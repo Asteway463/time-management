@@ -1,6 +1,6 @@
 {
   "name": "chronoflow",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
@@ -51,5 +51,6 @@
   "engines": {
     "node": ">=22.13.0"
   },
-  "private": true
+  "private": true,
+  "expo": { "autolinking": { "nativeModulesDir": "./modules" } }
 }

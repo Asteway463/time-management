@@ -10,6 +10,7 @@ import {
 } from './notifications';
 import { removeBackgroundImage } from './services/backgroundImage';
 import { loadAppData, saveAppData } from './storage';
+import { cancelNativeFocus, pauseNativeFocus } from './focusBlocker';
 import type {
   Alarm,
   AppData,
@@ -379,7 +380,8 @@ export function useChronoFlow() {
     }
   }, [cancelTimerNotification, focusMode, loaded, remaining, timerRunning, updateData]);
 
-  const startTimerForMode = (mode: FocusMode, seconds: number) => {
+  const startTimerForMode = (mode: FocusMode, seconds: number, nativeManaged = false) => {
+    if (!nativeManaged) cancelNativeFocus();
     const durationSeconds = Math.max(1, Math.round(seconds));
     const endsAt = Date.now() + durationSeconds * 1000;
     const sessionStartedAt = mode === 'work' ? Date.now() : null;
@@ -399,16 +401,17 @@ export function useChronoFlow() {
         sessionStartedAt,
       },
     }));
-    void scheduleTimerNotification(new Date(endsAt));
+    if (!nativeManaged) void scheduleTimerNotification(new Date(endsAt));
   };
 
-  const startFocusTimer = () => {
+  const startFocusTimer = (nativeManaged = false) => {
     const minutes = focusMode === 'work' ? data.focus.workMins
       : focusMode === 'shortBreak' ? data.focus.shortMins : data.focus.longMins;
-    startTimerForMode(focusMode, remaining > 0 ? remaining : minutes * 60);
+    startTimerForMode(focusMode, remaining > 0 ? remaining : minutes * 60, nativeManaged);
   };
 
   const pauseFocusTimer = () => {
+    pauseNativeFocus();
     const now = Date.now();
     const actualRemaining = timerEndAt !== null
       ? Math.max(0, Math.ceil((timerEndAt - now) / 1000))
@@ -461,9 +464,10 @@ export function useChronoFlow() {
     });
   };
 
-  const startQuickFocus = () => {
+  const startQuickFocus = (nativeManaged = false, startNativeSession?: () => boolean) => {
     if (timerRunning) pauseFocusTimer();
-    startTimerForMode('work', dataRef.current.focus.workMins * 60);
+    if (nativeManaged && startNativeSession && !startNativeSession()) return;
+    startTimerForMode('work', dataRef.current.focus.workMins * 60, nativeManaged);
   };
 
   const selectFocusMode = (mode: FocusMode) => {

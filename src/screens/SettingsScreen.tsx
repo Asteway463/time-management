@@ -14,28 +14,15 @@ type Props = {
   onSetTheme: (theme: 'light' | 'dark' | 'system') => void;
   onSetTimeFormat: (format: TimeFormat) => void;
   onSetBackgroundImage: (uri: string) => void;
-  onClearData: () => void;
-  onExportData: () => void;
 };
 
-export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onSetBackgroundImage, onClearData, onExportData }: Props) {
+export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onSetBackgroundImage }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
   const [pickingImage, setPickingImage] = useState(false);
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const versionCode = Constants.expoConfig?.android?.versionCode;
   const sdkVersion = Constants.expoConfig?.sdkVersion;
-
-  const handleClearData = () => {
-    Alert.alert(
-      'Clear all data',
-      'This deletes all tasks, alarms, notes, session history, and preferences from this device. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onClearData },
-      ],
-    );
-  };
 
   const chooseBackground = async () => {
     if (pickingImage) return;
@@ -151,13 +138,6 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
         {data.backgroundImage ? (
           <Button title="Remove background image" onPress={() => onSetBackgroundImage('')} variant="danger" />
         ) : null}
-      </Card>
-
-      <Card>
-        <Text style={styles.sectionTitle}>Data</Text>
-        <Text style={styles.aboutMeta}>Export writes a JSON snapshot through the Android share sheet.</Text>
-        <Button title="Export data" onPress={onExportData} variant="secondary" />
-        <Button title="Clear all data" onPress={handleClearData} variant="danger" />
       </Card>
 
       <Card>

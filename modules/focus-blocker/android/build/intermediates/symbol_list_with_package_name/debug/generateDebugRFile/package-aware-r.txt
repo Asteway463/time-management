@@ -1,0 +1,3 @@
+com.asteway.chronoflow
+string focus_blocker_accessibility_description
+xml focus_blocker_accessibility

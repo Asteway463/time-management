@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="focus_blocker_accessibility_description">Return to Ast Time when a selected app is opened during an active focus session.</string>
+</resources>

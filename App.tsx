@@ -288,6 +288,14 @@ function AtnaFlowApp() {
               </View>
             </View>
             <View style={styles.clockBox}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${isLight ? 'dark' : 'light'} appearance`}
+                onPress={() => flow.setTheme(isLight ? 'dark' : 'light')}
+                style={styles.themeToggle}
+              >
+                <Text style={styles.themeToggleText}>{isLight ? '☾' : '☀'}</Text>
+              </Pressable>
               <LiveClock timeFormat={flow.data.timeFormat} />
               <Text style={styles.version}>v{APP_VERSION}</Text>
             </View>
@@ -357,9 +365,11 @@ function AtnaFlowApp() {
                   timerRunning={flow.timerRunning}
                   onMode={flow.selectFocusMode}
                   onSettings={flow.openTimerSettings}
-                  onToggleTimer={flow.timerRunning ? flow.pauseFocusTimer : flow.startFocusTimer}
                   onReset={flow.resetFocusTimer}
                   onQuickFocus={flow.startQuickFocus}
+                  onNativeToggleTimer={(nativeManaged) => flow.timerRunning
+                    ? flow.pauseFocusTimer()
+                    : flow.startFocusTimer(nativeManaged)}
                 />
               )}
               {flow.tab === 'alarms' && (
@@ -395,8 +405,6 @@ function AtnaFlowApp() {
                   onSetTheme={flow.setTheme}
                   onSetTimeFormat={flow.setTimeFormat}
                   onSetBackgroundImage={flow.setBackgroundImage}
-                  onClearData={flow.clearAllData}
-                  onExportData={flow.exportData}
                 />
               )}
             </Animated.View>
@@ -514,6 +522,8 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   brandTitle: { fontSize: TYPE.headingSmall, fontWeight: '800', color: COLORS.text, letterSpacing: TRACKING.subtle },
   headerSubtitle: { color: COLORS.muted, fontSize: TYPE.caption, marginTop: SPACE.xs / 2 },
   clockBox: { alignItems: 'flex-end' },
+  themeToggle: { width: 36, height: 36, borderRadius: RADII.md, alignItems: 'center', justifyContent: 'center', marginBottom: SPACE.xs },
+  themeToggleText: { color: COLORS.primarySoft, fontSize: 24, fontWeight: '700' },
   version: { color: COLORS.muted, fontSize: TYPE.micro, marginTop: SPACE.xs / 2, fontVariant: ['tabular-nums'] },
   muted: { color: COLORS.muted, fontSize: TYPE.body, lineHeight: LINE_HEIGHT.body },
   tabsViewport: { width: '100%', maxWidth: LAYOUT.contentMaxWidth, alignSelf: 'center' },

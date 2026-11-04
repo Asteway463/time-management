@@ -52,7 +52,11 @@ npx eas-cli build --platform android --profile preview     # signed APK for dire
 npx eas-cli build --platform android --profile production  # signed AAB for Google Play
 ```
 
-The `preview` profile produces an APK. The `production` profile produces an app bundle and increments the remote Android version code. Signing credentials are stored by EAS, not in this repository.
+The `preview` profile produces an APK. The `production` profile produces an app bundle using the local version in `app.json` (`2.0.0`, Android version code `2`). Increment `android.versionCode` before the next Android upload. Signing credentials are stored by EAS, not in this repository.
+
+Android builds include ARM 32-bit and 64-bit native libraries; x86 emulator ABIs are excluded to keep install packages smaller. Google Play app bundles still deliver device-specific splits.
+
+The Android focus blocker and optional generated ambience require a custom native build, not Expo Go. Users must enable the optional Accessibility service and notification permission for the corresponding background features. Before Google Play submission, complete the Accessibility API and installed-app visibility declarations and disclose Accessibility use in the store listing.
 
 ## Verify the project
 

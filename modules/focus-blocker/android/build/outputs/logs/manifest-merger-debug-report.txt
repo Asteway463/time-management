@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml:2:13-83
+INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml:2:13-83
+	package
+		INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml
+	xmlns:android
+		ADDED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml:2:23-81
+uses-sdk
+INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml reason: use-sdk injection requested
+INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml
+INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml
+	android:targetSdkVersion
+		INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml
+	android:minSdkVersion
+		INJECTED from /home/atnatewos/Desktop/timemanager/modules/focus-blocker/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest17648708341983816511.xml

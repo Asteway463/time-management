@@ -2,7 +2,7 @@
   "expo": {
     "name": "Atna's Flow",
     "slug": "asttime",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -32,7 +32,8 @@
           "microphonePermission": false
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "./plugins/with-focus-blocker"
     ],
     "ios": {
       "bundleIdentifier": "com.asteway.chronoflow",
@@ -47,6 +48,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.asteway.chronoflow",
+      "versionCode": 2,
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.VIBRATE"
