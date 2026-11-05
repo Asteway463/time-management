@@ -13,7 +13,7 @@
     "production": {
       "autoIncrement": false,
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       }
     }
   },

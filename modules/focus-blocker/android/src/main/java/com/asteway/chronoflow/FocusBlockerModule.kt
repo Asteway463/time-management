@@ -46,8 +46,7 @@ class FocusBlockerModule : Module() {
               "icon" to Base64.encodeToString(bytes, Base64.NO_WRAP),
             )
           }.getOrNull()
-        }
-        .sortedBy { it["name"]?.lowercase() }
+        }.sortedBy { it["name"]?.lowercase() }
     }
 
     Function("openAccessibilitySettings") {
@@ -70,12 +69,15 @@ class FocusBlockerModule : Module() {
     Function("pauseSession") {
       appContext.reactContext?.startService(Intent(appContext.reactContext, FocusSessionService::class.java).setAction(FocusSessionService.ACTION_PAUSE))
     }
+
     Function("resumeSession") {
       appContext.reactContext?.startService(Intent(appContext.reactContext, FocusSessionService::class.java).setAction(FocusSessionService.ACTION_RESUME))
     }
+
     Function("stopSession") {
       appContext.reactContext?.startService(Intent(appContext.reactContext, FocusSessionService::class.java).setAction(FocusSessionService.ACTION_STOP))
     }
+
     Function("cancelSession") {
       appContext.reactContext?.startService(Intent(appContext.reactContext, FocusSessionService::class.java).setAction(FocusSessionService.ACTION_CANCEL))
     }
