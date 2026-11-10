@@ -3,10 +3,11 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, ScreenHeading } from '../components/Common';
-import { APP_NAME } from '../constants';
+import { APP_NAME, TAB_LABELS } from '../constants';
+import { checkForAppUpdate, openUpdatePage } from '../services/appUpdate';
 import { persistBackgroundImage } from '../services/backgroundImage';
 import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
-import type { AppData, TimeFormat } from '../types';
+import type { AppData, Tab, TimeFormat } from '../types';
 
 type Props = {
   data: AppData;
@@ -14,12 +15,15 @@ type Props = {
   onSetTheme: (theme: 'light' | 'dark' | 'system') => void;
   onSetTimeFormat: (format: TimeFormat) => void;
   onSetBackgroundImage: (uri: string) => void;
+  onToggleFeature: (tab: Tab) => void;
+  onSetAllFeatures: (enabled: boolean) => void;
 };
 
-export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onSetBackgroundImage }: Props) {
+export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetTimeFormat, onSetBackgroundImage, onToggleFeature, onSetAllFeatures }: Props) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
   const [pickingImage, setPickingImage] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const versionCode = Constants.expoConfig?.android?.versionCode;
   const sdkVersion = Constants.expoConfig?.sdkVersion;
@@ -44,6 +48,46 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
     }
   };
 
+  const checkForUpdates = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const result = await checkForAppUpdate();
+      if (result.status === 'required') {
+        Alert.alert(
+          'Update required',
+          `This application has to update. Version ${result.latestVersion} is required, but you are running ${result.currentVersion}. Install the latest version to keep using ${APP_NAME}.`,
+          [
+            { text: 'Later', style: 'cancel' },
+            { text: 'Update now', onPress: () => { void openUpdatePage(result.updateUrl); } },
+          ],
+        );
+      } else if (result.status === 'optional') {
+        Alert.alert(
+          'Update available',
+          `Version ${result.latestVersion} is available and you are running ${result.currentVersion}.${result.notes ? `\n\n${result.notes}` : ''}`,
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Update now', onPress: () => { void openUpdatePage(result.updateUrl); } },
+          ],
+        );
+      } else if (result.status === 'current') {
+        Alert.alert('You are up to date', `${APP_NAME} ${result.currentVersion} is the latest version.`);
+      } else {
+        Alert.alert(
+          'Could not check for updates',
+          `${result.message}\n\nYou can still open the store page to see if a newer version is available.`,
+          [
+            { text: 'Close', style: 'cancel' },
+            { text: 'Open store page', onPress: () => { void openUpdatePage(); } },
+          ],
+        );
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   return (
     <View style={styles.content}>
       <ScreenHeading title="Settings" subtitle="Preferences and your data, all on this device." />
@@ -63,6 +107,33 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
           Alarms are local notifications. Battery optimisation and Do Not Disturb can delay delivery, so keep {APP_NAME} unrestricted in Android settings if punctuality matters.
         </Text>
         <Button title="Open Android app settings" variant="secondary" onPress={() => { Linking.openSettings().catch((error: unknown) => { Alert.alert('Could not open settings', String(error)); }); }} />
+      </Card>
+
+      <Card>
+        <Text style={styles.sectionTitle}>Choose what to use</Text>
+        <Text style={styles.aboutMeta}>
+          Pick the features you want. Unselected features are hidden from the tab bar. Hold a tab name for 3 seconds to switch to it.
+        </Text>
+        <View style={styles.optionRow}>
+          <Button title="Select all" variant="secondary" small onPress={() => onSetAllFeatures(true)} />
+          <Button title="Clear all" variant="secondary" small onPress={() => onSetAllFeatures(false)} />
+        </View>
+        {TAB_LABELS.map((item) => (
+          <Pressable
+            key={item.id}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: data.enabledFeatures[item.id] }}
+            accessibilityLabel={`Toggle ${item.label} feature`}
+            onPress={() => onToggleFeature(item.id)}
+            style={[styles.featureRow, data.enabledFeatures[item.id] && styles.featureRowActive]}
+          >
+            <View style={styles.featureLeft}>
+              <Text style={styles.featureIcon}>{data.enabledFeatures[item.id] ? '☑' : '□'}</Text>
+              <Text style={styles.featureLabel}>{item.label}</Text>
+            </View>
+            <Text style={styles.featureHint}>Hold 3s to switch</Text>
+          </Pressable>
+        ))}
       </Card>
 
       <Card>
@@ -148,6 +219,11 @@ export function SettingsScreen({ data, onToggleNotifications, onSetTheme, onSetT
           {sdkVersion ? ` · Expo SDK ${sdkVersion}` : ''}
         </Text>
         <Text style={styles.aboutMeta}>{APP_NAME}. Asteway Teshome · © 2026</Text>
+        <Button
+          title={checkingUpdate ? 'Checking for updates…' : 'Check for updates'}
+          onPress={() => { void checkForUpdates(); }}
+          variant="secondary"
+        />
       </Card>
     </View>
   );
@@ -160,6 +236,22 @@ const createStyles = (COLORS: ThemeColors) => StyleSheet.create({
   label: { color: COLORS.text, fontSize: TYPE.body, flexShrink: 1 },
   value: { color: COLORS.textSecondary, fontSize: TYPE.body, fontWeight: '600' },
   optionRow: { flexDirection: 'row', gap: SPACE.sm },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACE.md,
+    paddingVertical: SPACE.sm,
+    paddingHorizontal: SPACE.md,
+    borderRadius: RADII.sm,
+    backgroundColor: COLORS.surfaceRaised,
+    marginTop: SPACE.xs,
+  },
+  featureRowActive: { backgroundColor: COLORS.primaryMuted, borderWidth: 1, borderColor: COLORS.primaryStrong },
+  featureLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flexShrink: 1 },
+  featureIcon: { color: COLORS.muted, fontSize: TYPE.body, width: 22 },
+  featureLabel: { color: COLORS.text, fontSize: TYPE.body, fontWeight: '600', flex: 1, minWidth: 0 },
+  featureHint: { color: COLORS.muted, fontSize: TYPE.caption },
   optionButton: {
     flex: 1,
     minHeight: 44,

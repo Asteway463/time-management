@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button, Card, EmptyCard, ScreenHeading } from '../components/Common';
-import { formatTime, WEEKDAY_NAMES } from '../constants';
+import { ALARM_SOUNDS, formatTime, WEEKDAY_NAMES } from '../constants';
 import { LAYOUT, RADII, SPACE, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
 import type { Alarm, TimeFormat } from '../types';
 
@@ -52,6 +52,7 @@ export function AlarmsScreen({
           const repeat = alarm.days.length === 0
             ? 'One time'
             : alarm.days.map((day) => WEEKDAY_NAMES[day].slice(0, 3)).join(', ');
+          const soundLabel = ALARM_SOUNDS.find((item) => item.id === alarm.sound)?.label ?? 'System default';
           return (
             <Card key={alarm.id}>
               <View style={styles.rowBetween}>
@@ -59,7 +60,7 @@ export function AlarmsScreen({
                   <Text style={[styles.time, !alarm.active && styles.inactive]}>{formatTime(alarm.time, timeFormat)}</Text>
                   <Text style={[styles.label, !alarm.active && styles.inactive]} numberOfLines={1}>{alarm.label}</Text>
                   <Text style={styles.meta} numberOfLines={1}>
-                    {repeat} · {alarm.category}{alarm.challenge === 'math' ? ' · Math challenge' : ''}
+                    {repeat} · {alarm.category} · {soundLabel}{alarm.challenge === 'math' ? ' · Math challenge' : ''}
                   </Text>
                 </View>
                 <Switch

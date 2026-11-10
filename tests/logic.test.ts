@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultData } from '../src/constants.ts';
-import { effectiveStreak, reactivateAlarm, recoverTimer, shouldRingForNotification, timerForMode } from '../src/logic.ts';
+import { compareVersions, effectiveStreak, reactivateAlarm, recoverTimer, shouldRingForNotification, timerForMode } from '../src/logic.ts';
 import type { Alarm } from '../src/types.ts';
 
 const MINUTE = 60_000;
@@ -12,6 +12,7 @@ const alarm = (overrides: Partial<Alarm> = {}): Alarm => ({
   label: 'Wake up',
   category: 'Personal',
   challenge: 'none',
+  sound: 'default',
   active: false,
   days: [],
   ...overrides,
@@ -28,6 +29,15 @@ test('effectiveStreak resets a stale streak', () => {
   assert.equal(effectiveStreak(5, '2026-06-13', now), 0);
   assert.equal(effectiveStreak(0, '2026-06-15', now), 0);
   assert.equal(effectiveStreak(5, '', now), 0);
+});
+
+test('compareVersions orders dotted versions numerically', () => {
+  assert.equal(compareVersions('2.0.0', '2.0.1'), -1);
+  assert.equal(compareVersions('2.1.0', '2.0.9'), 1);
+  assert.equal(compareVersions('2.0.0', '2.0.0'), 0);
+  assert.equal(compareVersions('v2.0', '2.0.0'), 0);
+  assert.equal(compareVersions('2.0.10', '2.0.9'), 1);
+  assert.equal(compareVersions('2.0.0-beta.1', '2.0.0'), 0);
 });
 
 test('recoverTimer recalculates a still-running timer', () => {

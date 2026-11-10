@@ -12,7 +12,7 @@ import kotlin.random.Random
 internal class FocusAudioEngine(context: Context) {
   private val active = AtomicBoolean(false)
   private val wakeLock = context.getSystemService(PowerManager::class.java)
-    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AstTime:FocusAudio").apply { setReferenceCounted(false) }
+    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AtnasFlow:FocusAudio").apply { setReferenceCounted(false) }
   private var audioTrack: AudioTrack? = null
   private var worker: Thread? = null
 
@@ -54,7 +54,7 @@ internal class FocusAudioEngine(context: Context) {
         val written = runCatching { track.write(chunk, 0, chunk.size, AudioTrack.WRITE_BLOCKING) }.getOrDefault(-1)
         if (written < 0) break
       }
-    }, "AstTimeFocusAudio").apply { isDaemon = true; start() }
+    }, "AtnasFlowFocusAudio").apply { isDaemon = true; start() }
   }
 
   fun stop() {

@@ -12,9 +12,10 @@ import {
   View,
 } from 'react-native';
 import { Button, ChoiceRow, Field, ModalHeading } from './Common';
-import { CATEGORIES, formatTime, WEEKDAY_NAMES, WEEKDAYS } from '../constants';
+import { ALARM_SOUNDS, CATEGORIES, formatTime, WEEKDAY_NAMES, WEEKDAYS } from '../constants';
+import { playAlarmPreview, useAlarmSound } from '../services/alarmSound';
 import { LAYOUT, LINE_HEIGHT, RADII, SPACE, TRACKING, TYPE, useThemeColors, useThemedStyles, type ThemeColors } from '../theme';
-import type { Alarm, Category, Priority, TimeFormat } from '../types';
+import type { Alarm, AlarmSound, Category, Priority, TimeFormat } from '../types';
 
 type AlarmFormProps = {
   visible: boolean;
@@ -28,6 +29,8 @@ type AlarmFormProps = {
   setCategory: (value: Alarm['category']) => void;
   challenge: Alarm['challenge'];
   setChallenge: (value: Alarm['challenge']) => void;
+  sound: AlarmSound;
+  setSound: (value: AlarmSound) => void;
   days: number[];
   setDays: React.Dispatch<React.SetStateAction<number[]>>;
 };
@@ -49,6 +52,20 @@ export function AlarmFormModal(props: AlarmFormProps) {
       </Field>
       <Field label="Dismiss challenge">
         <ChoiceRow<Alarm['challenge']> values={['none', 'math']} selected={props.challenge} onSelect={props.setChallenge} labels={{ none: 'Standard', math: 'Simple math' }} />
+      </Field>
+      <Field label="Alarm sound">
+        <ChoiceRow<AlarmSound>
+          values={ALARM_SOUNDS.map((item) => item.id)}
+          selected={props.sound}
+          onSelect={props.setSound}
+          labels={Object.fromEntries(ALARM_SOUNDS.map((item) => [item.id, item.label]))}
+        />
+        <Button
+          title={props.sound === 'default' ? 'Uses the system alarm sound' : 'Preview sound'}
+          variant="secondary"
+          small
+          onPress={() => playAlarmPreview(props.sound)}
+        />
       </Field>
       <Field label="Repeat days · leave empty for one time">
         <View style={styles.dayChoiceRow}>
@@ -173,6 +190,7 @@ export function RingingAlarmModal({
 }) {
   const colors = useThemeColors();
   const styles = useThemedStyles(createStyles);
+  useAlarmSound(alarm?.sound, alarm !== null);
   return (
     <Modal
       visible={alarm !== null}

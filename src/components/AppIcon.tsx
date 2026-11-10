@@ -3,7 +3,7 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 export type AppIconName =
   | 'home' | 'planner' | 'focus' | 'alarm' | 'stats' | 'settings'
-  | 'check' | 'close' | 'spark' | 'app' | 'trend' | 'clock' | 'plus';
+  | 'check' | 'close' | 'spark' | 'app' | 'trend' | 'clock' | 'plus' | 'book';
 
 type Props = { name: AppIconName; size?: number; color?: string; strokeWidth?: number };
 
@@ -25,6 +25,7 @@ export function AppIcon({ name, size = 20, color = '#FFFFFF', strokeWidth = 1.8 
       {name === 'app' && <><Rect {...common} x="4" y="3" width="16" height="18" rx="3" /><Path {...common} d="M9 8h6M9 12h6M9 16h3" /></>}
       {name === 'trend' && <><Path {...common} d="m3 17 6-6 4 4 8-9" /><Path {...common} d="M15 6h6v6" /></>}
       {name === 'clock' && <><Circle {...common} cx="12" cy="12" r="9" /><Path {...common} d="M12 7v5l3.5 2" /></>}
+      {name === 'book' && <><Path {...common} d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z" /><Path {...common} d="M4 4.5v15M8 6h8M8 10h8M8 14h5" /></>}
     </Svg>
   );
 }

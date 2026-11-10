@@ -8,16 +8,23 @@ import {
   scheduleFocusCompletionNotificationAsync,
   syncAlarmNotificationsAsync,
 } from './notifications';
+import { planItemsToTasks, type PlanItem } from './ai';
+import { playFocusCompleteAlert } from './services/alarmSound';
 import { removeBackgroundImage } from './services/backgroundImage';
+import { removePdfFile } from './services/pdfLibrary';
 import { loadAppData, saveAppData } from './storage';
 import { cancelNativeFocus, pauseNativeFocus } from './focusBlocker';
 import type {
   Alarm,
+  AlarmSound,
   AppData,
+  BlockerSettings,
   Category,
+  EnabledFeatures,
   FocusMode,
   FocusSession,
   Note,
+  PdfDocument,
   Priority,
   Tab,
   Task,
@@ -55,6 +62,7 @@ export function useChronoFlow() {
   const [alarmLabel, setAlarmLabel] = useState('');
   const [alarmCategory, setAlarmCategory] = useState<Alarm['category']>('Personal');
   const [alarmChallenge, setAlarmChallenge] = useState<Alarm['challenge']>('none');
+  const [alarmSound, setAlarmSound] = useState<AlarmSound>('default');
   const [alarmDays, setAlarmDays] = useState<number[]>([]);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskTime, setTaskTime] = useState('09:00');
@@ -160,6 +168,7 @@ export function useChronoFlow() {
         if (recovery.completedSession) {
           setTimeout(() => {
             if (mounted) {
+              playFocusCompleteAlert();
               Alert.alert('Focus session complete', 'Your focus session finished while the app was closed.');
             }
           }, 350);
@@ -364,6 +373,7 @@ export function useChronoFlow() {
         timer: timerForMode('work', current.focus.workMins, current.focus.shortMins, current.focus.longMins),
       }));
       setRemaining(dataRef.current.focus.workMins * 60);
+      playFocusCompleteAlert();
       Alert.alert('Focus session complete', 'Great work. Time for a break.');
       try { Speech.speak('Great job! Focus session complete. Time for a break.'); } catch {}
     } else {
@@ -375,6 +385,7 @@ export function useChronoFlow() {
         ? dataRef.current.focus.shortMins
         : dataRef.current.focus.longMins;
       setRemaining(breakMinutes * 60);
+      playFocusCompleteAlert();
       Alert.alert('Break complete', 'Ready to focus again?');
       try { Speech.speak('Break complete. Ready to focus again?'); } catch {}
     }
@@ -470,6 +481,14 @@ export function useChronoFlow() {
     startTimerForMode('work', dataRef.current.focus.workMins * 60, nativeManaged);
   };
 
+  /** Used by the AI coach to start a session of an exact length. */
+  const startFocusForMinutes = (minutes: number) => {
+    const safeMinutes = Math.min(120, Math.max(1, Math.round(minutes)));
+    if (timerRunning) pauseFocusTimer();
+    startTimerForMode('work', safeMinutes * 60);
+    setTab('focus');
+  };
+
   const selectFocusMode = (mode: FocusMode) => {
     if (timerRunning) pauseFocusTimer();
     const minutes = mode === 'work' ? dataRef.current.focus.workMins
@@ -527,6 +546,7 @@ export function useChronoFlow() {
     setAlarmLabel('');
     setAlarmCategory('Personal');
     setAlarmChallenge('none');
+    setAlarmSound('default');
     setAlarmDays([]);
   };
 
@@ -553,6 +573,7 @@ export function useChronoFlow() {
       label: alarmLabel.trim(),
       category: alarmCategory,
       challenge: alarmChallenge,
+      sound: alarmSound,
       days: [...alarmDays].sort(),
       active: true,
       ...(alarmDays.length === 0 ? { fireAt: nextTime(alarmTime).getTime() } : {}),
@@ -657,6 +678,7 @@ export function useChronoFlow() {
       label: `Snoozed: ${ringing.label}`,
       category: 'Personal',
       challenge: 'none',
+      sound: ringing.sound,
       days: [],
       active: true,
       fireAt: snoozed.getTime(),
@@ -712,6 +734,7 @@ export function useChronoFlow() {
     focusSessionStartedAtRef.current = null;
     void cancelTimerNotification();
     void removeBackgroundImage(dataRef.current.backgroundImage);
+    for (const pdf of dataRef.current.pdfs) void removePdfFile(pdf.uri);
     setRinging(null);
     setModal(null);
     lastFiredRef.current = '';
@@ -792,6 +815,70 @@ export function useChronoFlow() {
     }));
   };
 
+  const updateBlocker = (patch: Partial<BlockerSettings>) => {
+    updateData((current) => ({
+      ...current,
+      blocker: { ...current.blocker, ...patch },
+    }));
+  };
+
+  const toggleFeature = (tab: Tab) => {
+    updateData((current) => ({
+      ...current,
+      enabledFeatures: { ...current.enabledFeatures, [tab]: !current.enabledFeatures[tab] },
+    }));
+  };
+
+  const setAllFeatures = (enabled: boolean) => {
+    updateData((current) => {
+      const features: EnabledFeatures = { ...current.enabledFeatures };
+      for (const key of Object.keys(features) as Tab[]) features[key] = enabled;
+      return { ...current, enabledFeatures: features };
+    });
+  };
+
+  const addPlanItems = (items: PlanItem[]) => {
+    if (items.length === 0) return;
+    const tasks = planItemsToTasks(items, createId);
+    updateData((current) => ({
+      ...current,
+      tasks: [...current.tasks, ...tasks].sort((a, b) => a.time.localeCompare(b.time)),
+    }));
+  };
+
+  const addPdf = (pdf: Pick<PdfDocument, 'title' | 'uri' | 'size'>) => {
+    const now = Date.now();
+    const document: PdfDocument = {
+      id: createId('pdf'),
+      title: pdf.title,
+      uri: pdf.uri,
+      size: pdf.size,
+      addedAt: now,
+      lastOpenedAt: now,
+      lastPage: 1,
+    };
+    updateData((current) => ({ ...current, pdfs: [document, ...current.pdfs] }));
+  };
+
+  const updatePdfProgress = (id: string, lastPage: number) => {
+    const safePage = Math.max(1, Math.floor(lastPage));
+    updateData((current) => ({
+      ...current,
+      pdfs: current.pdfs.map((pdf) => pdf.id === id
+        ? { ...pdf, lastPage: safePage, lastOpenedAt: Date.now() }
+        : pdf),
+    }));
+  };
+
+  const deletePdf = (id: string) => {
+    const target = dataRef.current.pdfs.find((pdf) => pdf.id === id);
+    if (target) void removePdfFile(target.uri);
+    updateData((current) => ({
+      ...current,
+      pdfs: current.pdfs.filter((pdf) => pdf.id !== id),
+    }));
+  };
+
   const completedCount = data.tasks.filter((task) => task.completed).length;
   const progress = data.tasks.length ? Math.round((completedCount / data.tasks.length) * 100) : 0;
 
@@ -817,6 +904,8 @@ export function useChronoFlow() {
     setAlarmCategory,
     alarmChallenge,
     setAlarmChallenge,
+    alarmSound,
+    setAlarmSound,
     alarmDays,
     setAlarmDays,
     taskTitle,
@@ -847,6 +936,7 @@ export function useChronoFlow() {
     pauseFocusTimer,
     startFocusTimer,
     startQuickFocus,
+    startFocusForMinutes,
     resetFocusTimer,
     openTimerSettings,
     resetAlarmForm,
@@ -866,5 +956,12 @@ export function useChronoFlow() {
     restoreNote,
     purgeNote,
     toggleNotePin,
+    updateBlocker,
+    addPlanItems,
+    addPdf,
+    updatePdfProgress,
+    deletePdf,
+    toggleFeature,
+    setAllFeatures,
   };
 }

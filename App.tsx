@@ -26,8 +26,10 @@ import {
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { APP_NAME, TAB_LABELS } from './src/constants';
 import { AlarmsScreen } from './src/screens/AlarmsScreen';
+import { AssistantScreen } from './src/screens/AssistantScreen';
 import { FocusScreen } from './src/screens/FocusScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { LibraryScreen } from './src/screens/LibraryScreen';
 import { NotebookScreen } from './src/screens/NotebookScreen';
 import { PlannerScreen } from './src/screens/PlannerScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -303,7 +305,7 @@ function AtnaFlowApp() {
 
           <View style={styles.tabsViewport}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TAB_LABELS.map((item) => {
+              {TAB_LABELS.filter((item) => flow.data.enabledFeatures[item.id]).map((item) => {
                 const count = item.id === 'home' ? pendingTasks : 0;
                 return (
                   <Pressable
@@ -370,6 +372,7 @@ function AtnaFlowApp() {
                   onNativeToggleTimer={(nativeManaged) => flow.timerRunning
                     ? flow.pauseFocusTimer()
                     : flow.startFocusTimer(nativeManaged)}
+                  onUpdateBlocker={flow.updateBlocker}
                 />
               )}
               {flow.tab === 'alarms' && (
@@ -398,6 +401,22 @@ function AtnaFlowApp() {
                   onTogglePin={flow.toggleNotePin}
                 />
               )}
+              {flow.tab === 'assistant' && (
+                <AssistantScreen
+                  data={flow.data}
+                  onAddPlan={flow.addPlanItems}
+                  onStartFocus={flow.startFocusForMinutes}
+                  onNavigate={flow.setTab}
+                />
+              )}
+              {flow.tab === 'library' && (
+                <LibraryScreen
+                  pdfs={flow.data.pdfs}
+                  onAdd={flow.addPdf}
+                  onDelete={flow.deletePdf}
+                  onProgress={flow.updatePdfProgress}
+                />
+              )}
               {flow.tab === 'settings' && (
                 <SettingsScreen
                   data={flow.data}
@@ -405,6 +424,8 @@ function AtnaFlowApp() {
                   onSetTheme={flow.setTheme}
                   onSetTimeFormat={flow.setTimeFormat}
                   onSetBackgroundImage={flow.setBackgroundImage}
+                  onToggleFeature={flow.toggleFeature}
+                  onSetAllFeatures={flow.setAllFeatures}
                 />
               )}
             </Animated.View>
@@ -425,6 +446,8 @@ function AtnaFlowApp() {
             setCategory={flow.setAlarmCategory}
             challenge={flow.alarmChallenge}
             setChallenge={flow.setAlarmChallenge}
+            sound={flow.alarmSound}
+            setSound={flow.setAlarmSound}
             days={flow.alarmDays}
             setDays={flow.setAlarmDays}
           />

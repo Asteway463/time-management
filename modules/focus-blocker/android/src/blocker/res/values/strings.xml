@@ -1,0 +1,1 @@
+<resources><string name="focus_blocker_accessibility_description">Return to Atna\'s Flow when a selected app is opened during an active focus session. This service only reads the foreground package name; it never reads screen content.</string></resources>

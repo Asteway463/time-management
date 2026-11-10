@@ -1,23 +1,31 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { APP_NAME, formatTime, nextTime, validTime } from './constants';
-import type { Alarm, TimeFormat } from './types';
+import { ALARM_SOUNDS, APP_NAME, formatTime, nextTime, validTime } from './constants';
+import type { Alarm, AlarmSound, TimeFormat } from './types';
 
 export const ALARM_CHANNEL_ID = 'chronoflow-alarms-v2';
 
 type AlarmSyncResult = 'scheduled' | 'permission-denied' | 'none';
 
-let channelSetup: Promise<void> | null = null;
+const channelSetup = new Map<string, Promise<void>>();
 let alarmSyncQueue = Promise.resolve();
 
-export async function ensureAlarmChannelAsync(): Promise<void> {
+const soundFileFor = (sound: AlarmSound = 'default') =>
+  ALARM_SOUNDS.find((item) => item.id === sound)?.file ?? 'default';
+
+export const alarmChannelId = (sound: AlarmSound = 'default') =>
+  sound === 'default' ? ALARM_CHANNEL_ID : `${ALARM_CHANNEL_ID}-${sound}`;
+
+export async function ensureAlarmChannelAsync(sound: AlarmSound = 'default'): Promise<void> {
   if (Platform.OS !== 'android') return;
-  if (!channelSetup) {
-    channelSetup = Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
-      name: `${APP_NAME} alarms`,
+  const channelId = alarmChannelId(sound);
+  let setup = channelSetup.get(channelId);
+  if (!setup) {
+    setup = Notifications.setNotificationChannelAsync(channelId, {
+      name: sound === 'default' ? `${APP_NAME} alarms` : `${APP_NAME} alarms · ${sound}`,
       description: 'Alarm and focus timer reminders',
       importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
+      sound: soundFileFor(sound),
       audioAttributes: {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
@@ -26,15 +34,18 @@ export async function ensureAlarmChannelAsync(): Promise<void> {
           requestHardwareAudioVideoSynchronization: false,
         },
       },
-      vibrationPattern: [0, 500, 250, 500],
+      vibrationPattern: [0, 600, 300, 600, 300, 600],
       enableVibrate: true,
       showBadge: false,
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     }).then(() => undefined).catch((error: unknown) => {
-      channelSetup = null;
+      channelSetup.delete(channelId);
       throw error;
     });
+    channelSetup.set(channelId, setup);
   }
-  await channelSetup;
+  await setup;
 }
 
 async function cancelManagedAlarmNotificationsAsync(): Promise<void> {
@@ -96,17 +107,20 @@ async function synchronizeAlarmNotificationsAsync(
     return 'permission-denied';
   }
 
-  await ensureAlarmChannelAsync();
+  for (const sound of new Set(activeAlarms.map((alarm) => alarm.sound ?? 'default'))) {
+    await ensureAlarmChannelAsync(sound);
+  }
   await cancelManagedAlarmNotificationsAsync();
 
   try {
     for (const alarm of activeAlarms) {
+      const soundFile = soundFileFor(alarm.sound);
       const content: Notifications.NotificationContentInput = {
         title: alarm.label || `${APP_NAME} alarm`,
         body: `${alarm.category} alarm · ${formatTime(alarm.time, timeFormat)}`,
-        sound: 'default',
+        sound: soundFile,
         data: { alarmId: alarm.id },
-        ...(Platform.OS === 'android' ? { channelId: ALARM_CHANNEL_ID } : {}),
+        ...(Platform.OS === 'android' ? { channelId: alarmChannelId(alarm.sound) } : {}),
       };
 
       for (const trigger of triggersForAlarm(alarm)) {

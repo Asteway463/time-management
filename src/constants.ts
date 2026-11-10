@@ -1,4 +1,4 @@
-import type { AppData, FocusTimerState, Tab, Category } from './types';
+import type { AlarmSound, AppData, EnabledFeatures, FocusTimerState, Tab, Category } from './types';
 import type { AppIconName } from './components/AppIcon';
 
 export const STORAGE_KEY = 'asttime-state-v1';
@@ -8,6 +8,13 @@ export const APP_NAME = "Atna's Flow";
 export const CATEGORIES: Category[] = ['Work', 'Study', 'Exercise', 'Rest'];
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+export const ALARM_SOUNDS: { id: AlarmSound; label: string; file: string }[] = [
+  { id: 'default', label: 'System default', file: 'default' },
+  { id: 'chime', label: 'Chime', file: 'chime.wav' },
+  { id: 'bell', label: 'Bell', file: 'bell.wav' },
+  { id: 'digital', label: 'Digital', file: 'digital.wav' },
+  { id: 'gentle', label: 'Gentle', file: 'gentle.wav' },
+];
 export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'planner', label: 'Planner', icon: 'planner' },
@@ -15,8 +22,23 @@ export const TAB_LABELS: { id: Tab; label: string; icon: AppIconName }[] = [
   { id: 'alarms', label: 'Alarms', icon: 'alarm' },
   { id: 'stats', label: 'Stats', icon: 'stats' },
   { id: 'notebook', label: 'Notebook', icon: 'app' },
+  { id: 'assistant', label: 'AI', icon: 'spark' },
+  { id: 'library', label: 'Library', icon: 'book' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
+
+/** Every feature enabled by default. */
+export const defaultEnabledFeatures = (): EnabledFeatures => ({
+  home: true,
+  planner: true,
+  focus: true,
+  alarms: true,
+  stats: true,
+  notebook: true,
+  assistant: true,
+  library: true,
+  settings: true,
+});
 
 export const todayKey = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -43,12 +65,20 @@ export const defaultData = (): AppData => ({
     dailyGoal: 60,
   },
   timer: createDefaultTimer(),
+  blocker: {
+    mode: 'allow-only',
+    packages: [],
+    playAudio: false,
+    holdSeconds: 3,
+  },
+  pdfs: [],
   streak: 0,
   lastStreakDate: '',
   theme: 'system',
   timeFormat: '12h',
   notificationsEnabled: true,
   backgroundImage: '',
+  enabledFeatures: defaultEnabledFeatures(),
 });
 
 export const validTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -81,4 +111,11 @@ export const formatCountdown = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+export const formatFileSize = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'Unknown size';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };

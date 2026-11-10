@@ -6,9 +6,22 @@ plugins {
 group = 'com.asteway.chronoflow'
 version = '1.0.0'
 
+// The accessibility service and its resources live in src/blocker and are only
+// compiled into the opt-in app-blocker build. The default release APK must not
+// contain any AccessibilityService code, resource, or manifest component.
+def appBlockerEnabled = System.getenv('ATHNAS_ENABLE_APP_BLOCKER') == '1'
+
 android {
   namespace 'com.asteway.focusblocker'
   defaultConfig { versionCode 1; versionName '1.0.0' }
+  if (appBlockerEnabled) {
+    sourceSets {
+      main {
+        java.srcDir 'src/blocker/java'
+        res.srcDir 'src/blocker/res'
+      }
+    }
+  }
 }
 
 dependencies {

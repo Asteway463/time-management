@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "Atna's Flow",
+    "slug": "asttime",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#081321",
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#081321",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "chronoflow-alarms-v2",
+          "enableRemoteNotifications": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Atna's Flow uses your photo library only when you choose a background image.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-status-bar",
+      "./plugins/with-focus-blocker"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.asteway.chronoflow",
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#081321",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.asteway.chronoflow",
+      "versionCode": 2,
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "owner": "asteway"
+  }
+}
+
+
+

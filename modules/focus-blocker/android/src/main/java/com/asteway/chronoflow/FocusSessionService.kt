@@ -32,13 +32,26 @@ class FocusSessionService : Service() {
         val packages = intent.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
         val endAt = intent.getLongExtra(EXTRA_END_AT, 0L)
         val playAudio = intent.getBooleanExtra(EXTRA_AUDIO, false)
-        prefs.edit().putStringSet("packages", packages.toSet()).putLong("endAt", endAt).putBoolean("running", true).putBoolean("playAudio", playAudio).apply()
+        val mode = intent.getStringExtra(EXTRA_MODE) ?: "block-selected"
+        val holdSeconds = intent.getIntExtra(EXTRA_HOLD_SECONDS, 3).coerceIn(1, 10)
+        prefs.edit()
+          .putStringSet("packages", packages.toSet())
+          .putLong("endAt", endAt)
+          .putBoolean("running", true)
+          .putBoolean("playAudio", playAudio)
+          .putString("mode", mode)
+          .putInt("holdSeconds", holdSeconds)
+          .remove("blockedPackage")
+          .remove("blockedAppName")
+          .putLong("blockedAt", 0L)
+          .apply()
         startForeground(NOTIFICATION_ID, notification("Focus session active"))
         if (playAudio) focusAudio.start() else focusAudio.stop()
         scheduleEnd(endAt)
       }
       ACTION_PAUSE -> {
         prefs.edit().putBoolean("running", false).apply()
+        clearBlockedState()
         focusAudio.stop()
         cancelEndAlarm()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -71,6 +84,7 @@ class FocusSessionService : Service() {
   private fun finishSession() {
     focusAudio.stop()
     cancelEndAlarm()
+    clearBlockedState()
     prefs.edit().clear().apply()
     getSystemService(NotificationManager::class.java).notify(24, NotificationCompat.Builder(this, DONE_CHANNEL)
       .setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Focus session complete")
@@ -87,12 +101,23 @@ class FocusSessionService : Service() {
   private fun cancelSession() {
     focusAudio.stop()
     cancelEndAlarm()
+    clearBlockedState()
     prefs.edit().clear().apply()
     stopForeground(STOP_FOREGROUND_REMOVE)
     stopSelf()
   }
+
+  private fun clearBlockedState() {
+    prefs.edit()
+      .remove("blockedPackage")
+      .remove("blockedAppName")
+      .putLong("blockedAt", 0L)
+      .remove("allowPackage")
+      .putLong("allowUntil", 0L)
+      .apply()
+  }
   private fun notification(text: String) = NotificationCompat.Builder(this, SESSION_CHANNEL)
-    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Ast Time")
+    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm).setContentTitle("Atna's Flow")
     .setContentText(text).setOngoing(true).setCategory(NotificationCompat.CATEGORY_SERVICE).build()
   private fun createChannels() {
     if (Build.VERSION.SDK_INT >= 26) {
@@ -110,6 +135,8 @@ class FocusSessionService : Service() {
     const val EXTRA_PACKAGES = "packages"
     const val EXTRA_END_AT = "endAt"
     const val EXTRA_AUDIO = "playAudio"
+    const val EXTRA_MODE = "mode"
+    const val EXTRA_HOLD_SECONDS = "holdSeconds"
     const val SESSION_CHANNEL = "asttime-focus-session"
     const val DONE_CHANNEL = "asttime-focus-completion"
     const val NOTIFICATION_ID = 23

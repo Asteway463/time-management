@@ -7,3 +7,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .env*
+
+# signing secrets and local build state
+keystore.properties
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+app.json.save
+android
+ios

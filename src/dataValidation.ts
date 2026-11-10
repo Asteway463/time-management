@@ -1,13 +1,18 @@
 import { APP_NAME, createDefaultTimer, defaultData, nextTime, validTime } from './constants';
 import type {
   Alarm,
+  AlarmSound,
   AppData,
+  BlockerSettings,
   Category,
+  EnabledFeatures,
   FocusMode,
   FocusSession,
   FocusTimerState,
   Note,
+  PdfDocument,
   Priority,
+  Tab,
   Task,
 } from './types';
 
@@ -25,6 +30,13 @@ const isPriority = (value: unknown): value is Priority =>
 
 const isFocusMode = (value: unknown): value is FocusMode =>
   value === 'work' || value === 'shortBreak' || value === 'longBreak';
+
+const isAlarmSound = (value: unknown): value is AlarmSound =>
+  value === 'default'
+  || value === 'chime'
+  || value === 'bell'
+  || value === 'digital'
+  || value === 'gentle';
 
 function parseAlarm(value: unknown, now: number): Alarm | null {
   if (!isRecord(value)
@@ -58,9 +70,50 @@ function parseAlarm(value: unknown, now: number): Alarm | null {
     label: value.label.slice(0, 60),
     category,
     challenge,
+    sound: isAlarmSound(value.sound) ? value.sound : 'default',
     days,
     active: value.active && !expired,
     ...(fireAt === undefined ? {} : { fireAt }),
+  };
+}
+
+function parsePdf(value: unknown): PdfDocument | null {
+  if (!isRecord(value)
+    || typeof value.id !== 'string'
+    || typeof value.title !== 'string'
+    || typeof value.uri !== 'string') {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    title: value.title.slice(0, 200) || 'Untitled PDF',
+    uri: value.uri,
+    size: isFiniteNumber(value.size) && value.size >= 0 ? value.size : 0,
+    addedAt: isFiniteNumber(value.addedAt) ? value.addedAt : Date.now(),
+    lastOpenedAt: isFiniteNumber(value.lastOpenedAt) ? value.lastOpenedAt : 0,
+    lastPage: isFiniteNumber(value.lastPage) && value.lastPage >= 1
+      ? Math.floor(value.lastPage)
+      : 1,
+  };
+}
+
+function parseBlocker(value: unknown, fallback: BlockerSettings): BlockerSettings {
+  if (!isRecord(value)) return fallback;
+  const packages = Array.isArray(value.packages)
+    ? [...new Set(value.packages.filter((item): item is string => typeof item === 'string'))]
+    : fallback.packages;
+  const holdSeconds = isFiniteNumber(value.holdSeconds)
+    ? Math.min(10, Math.max(1, Math.round(value.holdSeconds)))
+    : fallback.holdSeconds;
+
+  return {
+    mode: value.mode === 'allow-only' || value.mode === 'block-selected'
+      ? value.mode
+      : fallback.mode,
+    packages,
+    playAudio: typeof value.playAudio === 'boolean' ? value.playAudio : fallback.playAudio,
+    holdSeconds,
   };
 }
 
@@ -158,6 +211,17 @@ function parseTimer(value: unknown, fallback: FocusTimerState): FocusTimerState 
   };
 }
 
+const ALL_TABS: Tab[] = ['home', 'planner', 'focus', 'alarms', 'stats', 'notebook', 'assistant', 'library', 'settings'];
+
+function parseEnabledFeatures(value: unknown, fallback: EnabledFeatures): EnabledFeatures {
+  if (!isRecord(value)) return fallback;
+  const result: EnabledFeatures = { ...fallback };
+  for (const tab of ALL_TABS) {
+    if (typeof value[tab] === 'boolean') result[tab] = value[tab];
+  }
+  return result;
+}
+
 export function parseAppData(value: unknown): AppData {
   const defaults = defaultData();
   if (!isRecord(value)) {
@@ -177,6 +241,9 @@ export function parseAppData(value: unknown): AppData {
   const focusSessions = Array.isArray(value.focusSessions)
     ? value.focusSessions.map(parseFocusSession).filter((session): session is FocusSession => session !== null)
     : defaults.focusSessions;
+  const pdfs = Array.isArray(value.pdfs)
+    ? value.pdfs.map(parsePdf).filter((pdf): pdf is PdfDocument => pdf !== null)
+    : defaults.pdfs;
 
   const focus = isRecord(value.focus) ? value.focus : {};
   const focusDate = typeof focus.focusDate === 'string' ? focus.focusDate : defaults.focus.focusDate;
@@ -202,6 +269,8 @@ export function parseAppData(value: unknown): AppData {
       dailyGoal,
     },
     timer: parseTimer(value.timer, createDefaultTimer(workMins)),
+    blocker: parseBlocker(value.blocker, defaults.blocker),
+    pdfs,
     streak: typeof value.streak === 'number' && Number.isInteger(value.streak) && value.streak >= 0
       ? value.streak
       : defaults.streak,
@@ -216,5 +285,6 @@ export function parseAppData(value: unknown): AppData {
       ? defaults.notificationsEnabled
       : value.notificationsEnabled,
     backgroundImage: typeof value.backgroundImage === 'string' ? value.backgroundImage : '',
+    enabledFeatures: parseEnabledFeatures(value.enabledFeatures, defaults.enabledFeatures),
   };
 }

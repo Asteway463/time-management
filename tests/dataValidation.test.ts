@@ -27,6 +27,47 @@ test('parseAppData fills notes and timer for data saved by older versions', () =
   assert.equal(parsed.timer.remainingSeconds, parsed.focus.workMins * 60);
 });
 
+test('parseAppData adds blocker, PDF, and alarm-sound defaults for older data', () => {
+  const legacy = {
+    ...defaultData(),
+    alarms: [{
+      id: 'alarm-legacy',
+      time: '07:30',
+      label: 'Wake up',
+      category: 'Personal',
+      challenge: 'none',
+      active: true,
+      days: [1],
+    }],
+  } as unknown as Record<string, unknown>;
+  delete legacy.blocker;
+  delete legacy.pdfs;
+
+  const parsed = parseAppData(legacy);
+  assert.equal(parsed.blocker.mode, 'allow-only');
+  assert.deepEqual(parsed.blocker.packages, []);
+  assert.equal(parsed.alarms[0].sound, 'default');
+  assert.deepEqual(parsed.pdfs, []);
+});
+
+test('parseAppData keeps valid blocker settings and PDF records', () => {
+  const data = defaultData();
+  data.blocker = { mode: 'block-selected', packages: ['com.example.app'], playAudio: true, holdSeconds: 4 };
+  data.pdfs = [{
+    id: 'pdf-1',
+    title: 'Notes',
+    uri: 'file:///documents/pdfs/notes.pdf',
+    size: 1234,
+    addedAt: 1,
+    lastOpenedAt: 2,
+    lastPage: 7,
+  }];
+
+  const parsed = parseAppData(data);
+  assert.deepEqual(parsed.blocker, data.blocker);
+  assert.deepEqual(parsed.pdfs, data.pdfs);
+});
+
 test('parseAppData validates notes and drops malformed entries', () => {
   const data = defaultData();
   data.notes = [

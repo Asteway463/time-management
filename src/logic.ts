@@ -77,6 +77,26 @@ export function recoverTimer(data: AppData, now = Date.now()): TimerRecovery {
   };
 }
 
+/**
+ * Compares dotted numeric versions. Returns -1 when `a` is older than `b`, 0
+ * when they are equal, and 1 when `a` is newer. A leading `v` and pre-release
+ * suffixes are ignored; only the leading numeric components matter.
+ */
+export function compareVersions(a: string, b: string): number {
+  const parts = (value: string) => value.trim().replace(/^v/i, '').split(/[-+]/)[0].split('.');
+  const left = parts(a);
+  const right = parts(b);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = Number.parseInt(left[index] ?? '0', 10);
+    const rightPart = Number.parseInt(right[index] ?? '0', 10);
+    const leftNumber = Number.isFinite(leftPart) ? leftPart : 0;
+    const rightNumber = Number.isFinite(rightPart) ? rightPart : 0;
+    if (leftNumber !== rightNumber) return leftNumber > rightNumber ? 1 : -1;
+  }
+  return 0;
+}
+
 export function timerForMode(
   mode: FocusTimerState['mode'],
   workMins: number,
